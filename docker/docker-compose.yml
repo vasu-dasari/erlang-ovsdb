@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  ovsdb:
+    image: vdasari/erlango:latest
+    container_name: ovsdb
+    hostname: ovsdb
+    volumes:
+        - ${HOME}:${HOME}
+    privileged: true
+
+  ovs1:
+    image: vdasari/ovs:fst_debian_host
+    container_name: ovs1
+    hostname: ovs1
+    command: start-userspace
+    volumes:
+        - ${HOME}:${HOME}
+    ports:
+      - 6640:6640
+    privileged: true

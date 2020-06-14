@@ -1,0 +1,17 @@
+{application, ovsdb, [
+    {description, "Erlang library for supporting OVSDB protocol"},
+    {vsn, "git"},
+    {registered, []},
+    {mod, {ovsdb_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        lager,
+        jsone,
+        lager
+    ]},
+    {env,[]},
+    {modules, []},
+    {licenses, ["Apache 2.0"]},
+    {links, [{"GitHub", "https://github.com/vasu-dasari/erlang-ovsdb"}]}
+]}.

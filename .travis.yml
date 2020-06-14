@@ -1,0 +1,26 @@
+language: erlang
+
+notifications:
+  email: vdasari@gmail.com
+
+os: linux
+
+otp_release:
+  - 22.0
+  - 21.0
+
+install:
+  - sudo pip install codecov
+
+script: make check
+  - rebar3 compile
+  - rebar3 xref
+  - rebar3 eunit
+  - rebar3 dialyzer
+  - rebar3 edoc
+  - rebar3 cover
+  - rebar3 as ct_profile covertool generate
+  - cp _build/covertool+test/covertool/ovsdb.covertool.xml ./cobertura.xml
+
+after_success:
+  - codecov
