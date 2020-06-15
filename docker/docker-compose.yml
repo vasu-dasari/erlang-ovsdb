@@ -16,6 +16,13 @@ services:
     command: start-userspace
     volumes:
         - ${HOME}:${HOME}
-    ports:
-      - 6640:6640
+    privileged: true
+
+  ovs2:
+    image: vdasari/ovs:fst_debian_host
+    container_name: ovs2
+    hostname: ovs2
+    command: start-userspace
+    volumes:
+        - ${HOME}:${HOME}
     privileged: true

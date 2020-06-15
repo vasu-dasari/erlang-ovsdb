@@ -11,6 +11,8 @@ otp_release:
 
 install:
   - sudo pip install codecov
+  - sudo apt-get install openvswitch-switch -y
+  - sudo ovs-vsctl set-manager ptcp:6640
 
 script: make check
   - rebar3 compile

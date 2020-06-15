@@ -31,8 +31,8 @@ update:
 clean:
 	@$(EXEC) "$(REBAR) clean"
 
-doc:
-	@$(EXEC) "$(REBAR) edoc"
+edoc:
+	@$(EXEC) "$(REBAR) as edown edoc"
 
 xref:
 	@$(EXEC) "$(REBAR) xref"

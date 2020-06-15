@@ -30,7 +30,7 @@ Usage Example
 API
 ---
 
-See [EDoc Document](doc/ovsdb.md)
+See [EDoc Document](doc)
 
 License
 -------

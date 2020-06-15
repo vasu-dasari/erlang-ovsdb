@@ -14,33 +14,14 @@
 %% limitations under the License.
 %%
 %% @author Vasu Dasari
-%% @doc
-%% @private
+%% @doc Module providing APIs similar to that od ovs-vsctl utility
+%%
 %% @end
-%% Created : 15. Jun 2020 7:20 AM
+%% Created : 17. Jun 2020
 %%-------------------------------------------------------------------
+
+-module(ovsdb_vsctl).
 -author("Vasu Dasari").
 
-%%------------------------------------------------------------------------------
-%% Logging macros
-%%------------------------------------------------------------------------------
-
--define(DEBUG(Msg),
-    ok = lager:debug(Msg)).
--define(DEBUG(Msg, Args),
-    ok = lager:debug(Msg, Args)).
-
--define(INFO(Msg),
-    ok = lager:info(Msg)).
--define(INFO(Msg, Args),
-    ok = lager:info(Msg, Args)).
-
--define(WARNING(Msg),
-    ok = lager:warning(Msg)).
--define(WARNING(Msg, Args),
-    ok = lager:warning(Msg, Args)).
-
--define(ERROR(Msg),
-    ok = lager:error(Msg)).
--define(ERROR(Msg, Args),
-    ok = lager:error(Msg, Args)).
+%% API
+-export([]).
