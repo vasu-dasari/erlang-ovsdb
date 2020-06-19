@@ -87,7 +87,7 @@ lock_ops(Pid, Op, Id) when Op == lock; Op == steal; Op == unlock ->
     gen_server:call(Pid, {lock, Op, Id, self(), rpc2map(Op, Id, [Id])}).
 
 echo(Pid) ->
-    gen_server:call(Pid, {send, rpc2map(echo, 0, [])}).
+    gen_server:call(Pid, {send, rpc2map(echo, "echo", [])}).
 
 get_columns(Pid, DbName, Table) ->
     case get_schema(Pid, DbName) of

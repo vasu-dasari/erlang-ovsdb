@@ -40,7 +40,7 @@
     terminate/2,
     code_change/3]).
 
--export([start/2]).
+-export([start/2, start/3, start/4]).
 
 -export([
     list_dbs/0, list_dbs/1,
