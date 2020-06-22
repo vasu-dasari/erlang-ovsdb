@@ -24,6 +24,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-export([ setup/0, teardown/1, sync_call/3, wait_sync_call/1]).
 -export([packet/1]).
 
 -define(OVSDB_Server_Ip, {127, 0, 0, 1}).
@@ -50,7 +51,8 @@ setup() ->
         [binary, {reuseaddr, true}, {active, false},
             {ip, ?OVSDB_Server_Ip}]),
 
-    ok = ovsdb_client:start(?OVSDB_Server_Ip, ?Server_Port, []),
+    ok = ovsdb_client:start(?OVSDB_Server_Ip, ?Server_Port,
+        #{database => <<"Open_vSwitch">>}),
     {ok, ClientSocket} = gen_tcp:accept(ServerSocket),
     {ovsdb_client, ServerSocket, ClientSocket}.
 
@@ -88,7 +90,7 @@ list_dbs({_Pid, _ServerSocket, ClientSocket}) ->
 get_schema({_Pid, _ServerSocket, ClientSocket}) ->
     {"get_schema",
         fun() ->
-            generic_method(ClientSocket, get_schema, ["Open_vSwitch"])
+            generic_method(ClientSocket, get_schema, [#{}])
         end
     }.
 

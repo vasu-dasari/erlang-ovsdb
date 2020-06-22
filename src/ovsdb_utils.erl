@@ -44,7 +44,7 @@ whocalledme() ->
             StackTrace
     end.
 
-to_binstring(Term) when is_list(Term) ->
+to_binstring([I|_] = Term) when is_list(Term), not is_binary(I) ->
     erlang:list_to_binary(Term);
 to_binstring(Term) when is_atom(Term) ->
     erlang:atom_to_binary(Term, utf8);

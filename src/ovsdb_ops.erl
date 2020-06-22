@@ -89,10 +89,10 @@ conditions(Conditions) ->
         ({C, F, V}, Acc) ->
             [[ovsdb_utils:to_binstring(C),
                 ovsdb_utils:to_binstring(F),
-                ovsdb_utils:to_binstring(V)] | Acc];
+                V] | Acc];
         (#ovsdb_condition{column = C, function = F, value = V}, Acc) ->
             [[ovsdb_utils:to_binstring(C),
                 ovsdb_utils:to_binstring(F),
-                ovsdb_utils:to_binstring(V)] | Acc]
+                V] | Acc]
     end, [], Conditions).
 

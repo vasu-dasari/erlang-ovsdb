@@ -37,8 +37,8 @@
 ]).
 
 -export([
-    get_columns/3,
-    get_tables/2,
+    list_columns/3,
+    list_tables/2,
     get_content/3
 ]).
 
@@ -49,33 +49,33 @@
 list_dbs(Pid) ->
     gen_server:call(Pid, {send, rpc2map(list_dbs, 0, [])}).
 
-get_schema(Pid, DbName) ->
-    gen_server:call(Pid, {send, rpc2map(get_schema, 0, [DbName])}).
+get_schema(Pid, Opts) ->
+    gen_server:call(Pid, {send, rpc2map(get_schema, 0, [get_database(Pid, Opts)])}).
 
-transaction(Pid, DbName, Operation) when not is_list(Operation) ->
-    transaction(Pid, DbName, [Operation]);
-transaction(Pid, DbName, Operations) when is_list(Operations) ->
-    gen_server:call(Pid, {send, rpc2map(transact, 0, [DbName] ++ Operations)}).
+transaction(Pid, Operation, Opts) when not is_list(Operation) ->
+    transaction(Pid, Opts, [Operation]);
+transaction(Pid, Operations, Opts) when is_list(Operations) ->
+    gen_server:call(Pid, {send, rpc2map(transact, 0, [get_database(Pid, Opts)] ++ Operations)}).
 
-cancel(Pid, DbName, Operation) when not is_list(Operation) ->
-    cancel(Pid, DbName, [Operation]);
-cancel(Pid, DbName, Operations) when is_list(Operations) ->
-    gen_server:call(Pid, {send, rpc2map(cancel, 0, [DbName] ++ Operations)}).
+cancel(Pid, Operation, Opts) when not is_list(Operation) ->
+    cancel(Pid, Opts, [Operation]);
+cancel(Pid, Operations, Opts) when is_list(Operations) ->
+    gen_server:call(Pid, {send, rpc2map(cancel, 0, [get_database(Pid, Opts)] ++ Operations)}).
 
-monitor(Pid, Id, DbName, Select) ->
-    monitor(Pid, self(), Id, DbName, Select).
+monitor(Pid, Id, Select, Opts) ->
+    monitor(Pid, self(), Id, Select, Opts).
 
-monitor(Pid, FromPid, Id, DbName, Table) when is_binary(Table); is_atom(Table) ->
-    case get_columns(Pid, DbName, Table) of
+monitor(Pid, FromPid, Id, Table, Opts) when is_binary(Table); is_atom(Table) ->
+    case list_columns(Pid, Table, Opts) of
         {ok, Columns} ->
-            monitor(Pid, FromPid, Id, DbName,
-                [#{Table => #{<<"columns">> => Columns}}]
+            monitor(Pid, FromPid, Id,
+                [#{Table => #{<<"columns">> => Columns}}], Opts
             );
         R -> R
     end;
-monitor(Pid, FromPid, Id, DbName, Reqs) when is_list(Reqs) ->
+monitor(Pid, FromPid, Id, Reqs, Opts) when is_list(Reqs) ->
     gen_server:call(Pid, {send,
-        rpc2map(monitor, Id, [DbName, id_with_pid(Id, FromPid)] ++ Reqs)}).
+        rpc2map(monitor, Id, [get_database(Pid, Opts), id_with_pid(Id, FromPid)] ++ Reqs)}).
 
 monitor_cancel(Pid, Id) ->
     gen_server:call(Pid, {send,
@@ -89,29 +89,30 @@ lock_ops(Pid, Op, Id) when Op == lock; Op == steal; Op == unlock ->
 echo(Pid) ->
     gen_server:call(Pid, {send, rpc2map(echo, "echo", [])}).
 
-get_columns(Pid, DbName, Table) ->
-    case get_schema(Pid, DbName) of
+list_columns(Pid, Table, Opts) ->
+    case get_schema(Pid, Opts) of
         {ok, #{<<"tables">> := #{Table := #{<<"columns">> := ColSchema}}}} ->
             {ok, maps:keys(ColSchema)};
         Ret ->
             Ret
     end.
-get_tables(Pid, DbName) ->
-    case get_schema(Pid, DbName) of
+
+list_tables(Pid, Opts) ->
+    case get_schema(Pid, Opts) of
         {ok, #{<<"tables">> := TableSchema}} ->
             {ok, maps:keys(TableSchema)};
         Ret ->
             Ret
     end.
 
-get_content(Pid, DbName, Table) when is_binary(Table); is_atom(Table) ->
-    case get_columns(Pid, DbName, Table) of
+get_content(Pid, Table, Opts) when is_binary(Table); is_atom(Table) ->
+    case list_columns(Pid, Table, Opts) of
         {ok, Columns} ->
-            get_content(Pid, DbName, [#{Table => #{<<"columns">> => Columns}}]);
+            get_content(Pid, [#{Table => #{<<"columns">> => Columns}}], Opts);
         R -> R
     end;
-get_content(Pid, DbName, Operations) ->
-    transaction(Pid, DbName, Operations).
+get_content(Pid, Operations, Opts) ->
+    transaction(Pid, Operations, Opts).
 
 process_message(
         #{<<"method">> := <<"echo">>, <<"id">> := Id, <<"params">> := Params}, State) ->
@@ -185,3 +186,7 @@ rpc2map(Invalid, _, _) ->
 id_with_pid(Id, FromPid) ->
     Id ++ "," ++ erlang:pid_to_list(FromPid).
 
+get_database(_Pid, #{database := DbName}) ->
+    DbName;
+get_database(Pid, _) ->
+    ovsdb_client:get_database(Pid).

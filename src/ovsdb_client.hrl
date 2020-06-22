@@ -24,7 +24,7 @@
 -include("ovsdb_api.hrl").
 -include("logger.hrl").
 
--define(SERVER, ?MODULE).
+-define(SERVER, ovsdb_client).
 
 -define(init_msg_id(),
     erlang:put(method_id,1)
@@ -36,14 +36,17 @@
 
 -type dst() :: pid() | port() | (RegName :: atom()) | {RegName :: atom(), Node :: node()}.
 -type json_value()  :: jsone:json_value().
+-type db_name() :: iolist() | binary().
+-type ip_addr() :: inet:socket_address() | inet:hostname().
 
 -record(ovsdb_state, {
     proc = ?SERVER          :: dst(),
     proto = tcp             :: tcp | ssl,
-    ip_addr = 'any'         :: inet:socket_address() | inet:hostname(),
+    ip_addr = 'any'         :: ip_addr(),
     port = 0                :: inet:port_number(),
     timeout = 5000          :: non_neg_integer(),
     socket = not_connected  :: gen_tcp:socket() | ssl:sslsocket() | atom(),
+    database = <<>>         :: db_name(),
     pending_messages = #{}  :: map(),
     locks_map = #{}         :: map(),
     msg_buffer = <<>>       :: binary()
