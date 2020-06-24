@@ -8,8 +8,7 @@
         stdlib,
         ssl,
         lager,
-        jsone,
-        lager
+        jsone
     ]},
     {env,[]},
     {modules, []},

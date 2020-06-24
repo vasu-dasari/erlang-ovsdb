@@ -8,6 +8,9 @@ services:
     volumes:
         - ${HOME}:${HOME}
     privileged: true
+    networks:
+      default_ovsdb_net:
+        ipv4_address: 10.1.123.10
 
   ovs1:
     image: vdasari/ovs:fst_debian_host
@@ -16,7 +19,9 @@ services:
     command: start-userspace
     volumes:
         - ${HOME}:${HOME}
-    privileged: true
+    networks:
+      default_ovsdb_net:
+        ipv4_address: 10.1.123.20
 
   ovs2:
     image: vdasari/ovs:fst_debian_host
@@ -26,3 +31,14 @@ services:
     volumes:
         - ${HOME}:${HOME}
     privileged: true
+    networks:
+      default_ovsdb_net:
+        ipv4_address: 10.1.123.30
+
+networks:
+  default_ovsdb_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.1.123.0/24
