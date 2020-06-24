@@ -25,6 +25,9 @@
 -include("logger.hrl").
 %% API
 -export([pretty_print/1, backtrace/0, whocalledme/0, to_binstring/1]).
+-export([
+    unit_test_ovs/0
+]).
 
 pretty_print(Item) ->
     io_lib:format("~s",[io_lib_pretty:print(Item)]).
@@ -52,3 +55,54 @@ to_binstring(Term) when is_number(Term) ->
     erlang:integer_to_binary(Term);
 to_binstring(Term) ->
     Term.
+
+%% Script to do sanity test with OVS. This will be in place till docker based tests are implemented.
+unit_test_ovs() ->
+    ok = ovsdb_client:start("10.1.123.20:6640", #{database => <<"Open_vSwitch">>}),
+    timer:sleep(1000),
+
+    {ok,_} = ovsdb_client:list_dbs(),
+    {ok,_} = ovsdb_client:get_schema(#{database => <<"_Server">>}),
+    {ok,_} = ovsdb_client:list_columns(<<"Bridge">>),
+
+    {ok,_} = ovsdb_client:transaction([ovsdb_ops:select([<<"_uuid">>, <<"bridges">>], <<"Open_vSwitch">>, [])]),
+    {ok,_} = ovsdb_client:transaction([ovsdb_ops:select([], <<"Open_vSwitch">>, [])], #{}),
+
+    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select("*", <<"Bridge">>, [])),
+    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select([<<"flood_vlans">>, <<"name">>], <<"Bridge">>, [])),
+
+    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select("*", <<"Bridge">>, [])),
+    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select([<<"flood_vlans">>, <<"name">>], <<"Bridge">>, [])),
+    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select([<<"flood_vlans">>, <<"name">>], <<"Bridge">>, [{<<"name">>, <<"==">>, <<"br0">>}])),
+
+
+    {ok,_} = ovsdb_client:monitor("hello", <<"Bridge">>),
+    {ok,_} = ovsdb_client:monitor_cancel("hello"),
+
+    {ok,_} = ovsdb_client:echo(),
+
+    {ok,_} = ovsdb_client:lock("hello"),
+    {ok,_} = ovsdb_client:unlock("hello"),
+
+    {ok,_} = ovsdb_client:transaction([ovsdb_ops:select([<<"_uuid">>, <<"bridges">>], <<"Open_vSwitch">>, [])]),
+
+    {ok,_} = ovsdb_client:dump(<<"Port">>, []),
+    {ok,_} = ovsdb_client:dump(<<"Open_vSwitch">>, []),
+    {ok,_} = ovsdb_client:dump(<<"Bridge">>, []),
+
+    {ok,_} = ovsdb_vsctl:vsctl(add_br, #{br_name => <<"br1">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(add_br, #{br_name => <<"br2">>}),
+
+    {ok,_} = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br1">>, port_name => <<"br1-eth1">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br1">>, port_name => <<"br1-eth2">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br2">>, port_name => <<"br2-eth1">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br2">>, port_name => <<"br2-eth2">>}),
+
+    {ok,_} = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br1">>, port_name => <<"br1-eth1">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br1">>, port_name => <<"br1-eth2">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br2">>, port_name => <<"br2-eth1">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br2">>, port_name => <<"br2-eth2">>}),
+
+    {ok,_} = ovsdb_vsctl:vsctl(del_br, #{br_name => <<"br1">>}),
+    {ok,_} = ovsdb_vsctl:vsctl(del_br, #{br_name => <<"br2">>}),
+    ok.
