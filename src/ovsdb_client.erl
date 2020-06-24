@@ -41,16 +41,16 @@
     code_change/3]).
 
 -export([
-    start/2, start/3, start/4,
+    start/2, start/3,
     get_database/0, get_database/1
 ]).
 
 -export([
     list_dbs/0, list_dbs/1,
-    get_schema/1, get_schema/2,
-    transaction/2, transaction/3,
-    cancel/2, cancel/3,
-    monitor/3, monitor/4,
+    get_schema/0, get_schema/1,
+    transaction/1, transaction/2,
+    cancel/1, cancel/2,
+    monitor/2, monitor/3,
     monitor_cancel/1, monitor_cancel/2,
     lock/1, lock/2,
     steal/1, steal/2,
@@ -59,20 +59,38 @@
 ]).
 
 -export([
-    list_columns/2, list_columns/3,
-    list_tables/1, list_tables/2,
-    dump/2, dump/3, dump/4]).
+    list_columns/1, list_columns/2,
+    list_tables/0, list_tables/1,
+    dump/2, dump/3
+]).
+
+-export([
+    get_proc/1
+]).
+
+-compile({no_auto_import,[monitor/3]}).
 
 -export_type([opts/0, rpc_return/0]).
 
 -type rpc_return() :: {ok, term()} | {error, term()} | not_connected.
--type opts()        :: map().
 -type db_table()    :: iolist() | binary().
 -type ovsdb_ops()   :: map() | list().
+-type opts()        :: #{
+            pid => dst(),
+            database => db_name(),
+            br_name => iolist(),
+            port_name => iolist()
+        }.
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+%% Retrieve pid from the options
+%% @private
+get_proc(#{pid := Pid}) -> Pid;
+get_proc(_) -> ?SERVER.
+
 %% @doc Starts TCP connection
 %%
 %% Establishes TCP connection with OVSDB server identified by IpAddr and Port. Optionally
@@ -80,12 +98,9 @@
 %% Opts = #{database => "DbName"
 %% If a connection is already in polace, it would drop it and restarts new session if endpoint
 %% is different.
--spec start(dst(), ip_addr(), inet:port_number(), opts()) -> ok.
-start(Dst, IpAddr, Port, Opts) ->
-    gen_server:call(Dst, {start, IpAddr, Port, Opts}).
-
+-spec start(ip_addr(), inet:port_number(), opts()) -> ok.
 start(IpAddr, Port, Opts) ->
-    start(?MODULE, IpAddr, Port, Opts).
+    gen_server:call(get_proc(Opts), {start, IpAddr, Port, Opts}).
 
 %% @doc Starts TCP connection
 %%
@@ -96,10 +111,10 @@ start(IpPortStr, Opts) when is_list(IpPortStr) ->
     {ok, IpAddr} = inet:ip(IpStr),
     start(IpAddr, Port, Opts).
 
-%% @equiv get_database(ovsdb_client)
+%% @private
 get_database() ->
     get_database(?SERVER).
-%% @doc Get OVSDB default database
+%% @private
 -spec get_database(dst()) -> db_name().
 get_database(Dst) ->
     gen_server:call(Dst, get_database).
@@ -110,34 +125,34 @@ get_database(Dst) ->
 %% @doc Lists available databases
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.1">4.1.1. List Databases</a>
--spec list_dbs(dst()) -> rpc_return().
-list_dbs(Dst) ->    ovsdb_protocol:list_dbs(Dst).
-%% @equiv list_dbs(ovsdb_client)
-list_dbs() ->       list_dbs(?SERVER).
+-spec list_dbs(opts()) -> rpc_return().
+list_dbs(Opts) ->    ovsdb_protocol:list_dbs(Opts).
+%% @equiv list_dbs(#{})
+list_dbs() ->       list_dbs(#{}).
 
 %% @doc Get database schema
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.2">4.1.2. Get Schema</a>
--spec get_schema(dst(), opts()) -> rpc_return().
-get_schema(Dst, Opts) -> ovsdb_protocol:get_schema(Dst, Opts).
-%% @equiv get_schema(ovsdb_client, Opts)
-get_schema(Opts)      -> get_schema(?SERVER, Opts).
+-spec get_schema(opts()) -> rpc_return().
+get_schema(Opts) -> ovsdb_protocol:get_schema(Opts).
+%% @equiv get_schema(#{})
+get_schema()      -> get_schema(#{}).
 
 %% @doc Perform OVSDB Transaction
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.3">4.1.3. Transaction</a>
--spec transaction(dst(), ovsdb_ops(), opts()) -> rpc_return().
-transaction(Dst, Operation, Opts) -> ovsdb_protocol:transaction(Dst, Operation, Opts).
-%% @equiv transaction(ovsdb_client, Operation, Opts)
-transaction(Operation, Opts)      -> transaction(?SERVER, Operation, Opts).
+-spec transaction(ovsdb_ops(), opts()) -> rpc_return().
+transaction(Operation, Opts) -> ovsdb_protocol:transaction(Operation, Opts).
+%% @equiv transaction(Operation, #{})
+transaction(Operation)      -> transaction(Operation, #{}).
 
 %% @doc Cancel Transaction
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.4">4.1.4. Cancel</a>
--spec cancel(dst(), ovsdb_ops(), opts()) -> rpc_return().
-cancel(Dst, Operation, Opts) -> ovsdb_protocol:cancel(Dst, Operation, Opts).
-%% @equiv cancel(ovsdb_client, Operation, Opts)
-cancel(Operation, Opts) -> cancel(?SERVER, Operation, Opts).
+-spec cancel(ovsdb_ops(), opts()) -> rpc_return().
+cancel(Operation, Opts) -> ovsdb_protocol:cancel(Operation, Opts).
+%% @equiv cancel(Operation, #{})
+cancel(Operation) -> cancel(Operation, #{}).
 
 %% @doc Monitor
 %%
@@ -150,18 +165,18 @@ cancel(Operation, Opts) -> cancel(?SERVER, Operation, Opts).
 %% '''
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.5">4.1.5. Monitor</a>
--spec monitor(dst(), json_value(), term(), opts()) -> rpc_return().
-monitor(Dst, Id, Select, Opts) -> ovsdb_protocol:monitor(Dst, Id, Select, Opts).
-%% @equiv monitor(ovsdb_client, Id, Select, Opts)
-monitor(Id, Select, Opts) -> monitor(?SERVER, Id, Select, Opts).
+-spec monitor(json_value(), term(), opts()) -> rpc_return().
+monitor(Id, Select, Opts) -> ovsdb_protocol:monitor(Id, Select, Opts).
+%% @equiv monitor(Id, Select, #{})
+monitor(Id, Select) -> monitor(Id, Select, #{}).
 
 %% @doc Cancel Monitor Operation
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.7">4.1.7. Monitor Cancellation</a>
--spec monitor_cancel(dst(), json_value()) -> rpc_return().
-monitor_cancel(Dst, Id) -> ovsdb_protocol:monitor_cancel(Dst, Id).
-%% @equiv monitor_cancel(ovsdb_client, Id)
-monitor_cancel(Id) -> monitor_cancel(?SERVER, Id).
+-spec monitor_cancel(json_value(), opts()) -> rpc_return().
+monitor_cancel(Id, Opts) -> ovsdb_protocol:monitor_cancel(Id, Opts).
+%% @equiv monitor_cancel(Id, #{})
+monitor_cancel(Id) -> monitor_cancel(Id, #{}).
 
 %% @doc Lock Database
 %%
@@ -174,10 +189,10 @@ monitor_cancel(Id) -> monitor_cancel(?SERVER, Id).
 %% '''
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.8">4.1.8. Lock Operations</a>
--spec lock(dst(), json_value()) -> rpc_return().
-lock(Dst, Id) -> ovsdb_protocol:lock_ops(Dst, lock, Id).
-%% @equiv lock(ovsdb_client, Id)
-lock(Id) -> lock(?SERVER, Id).
+-spec lock(json_value(), opts()) -> rpc_return().
+lock(Id, Opts) -> ovsdb_protocol:lock_ops(lock, Id, Opts).
+%% @equiv lock(Id, #{})
+lock(Id) -> lock(Id, #{}).
 
 %% @doc Steal lock
 %%
@@ -186,20 +201,20 @@ lock(Id) -> lock(?SERVER, Id).
 %% had lock that the lock is stolen.
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.8">4.1.8. Lock Operations</a>
--spec steal(dst(), json_value()) -> rpc_return().
-steal(Dst, Id) -> ovsdb_protocol:lock_ops(Dst, steal, Id).
-%% @equiv steal(ovsdb_client, Id)
-steal(Id) -> steal(?SERVER, Id).
+-spec steal(json_value(), opts()) -> rpc_return().
+steal(Id, Opts) -> ovsdb_protocol:lock_ops(steal, Id, Opts).
+%% @equiv steal(Id, #{})
+steal(Id) -> steal(Id, #{}).
 
 %% @doc Unlock database
 %%
 %% Unlock the database by releasing the lock.
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.8">4.1.8. Lock Operations</a>
--spec unlock(dst(), json_value()) -> rpc_return().
-unlock(Dst, Id) -> ovsdb_protocol:lock_ops(Dst, unlock, Id).
-%% @equiv unlock(ovsdb_client, Id)
-unlock(Id) -> unlock(?SERVER, Id).
+-spec unlock(json_value(), opts()) -> rpc_return().
+unlock(Id, Opts) -> ovsdb_protocol:lock_ops(unlock, Id, Opts).
+%% @equiv unlock(Id, #{})
+unlock(Id) -> unlock(Id, #{}).
 
 %% @doc Echo
 %%
@@ -208,44 +223,33 @@ unlock(Id) -> unlock(?SERVER, Id).
 %% be used for debugging.
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.11">4.1.11. Echo</a>
--spec echo(dst()) -> rpc_return().
-echo(Dst) -> ovsdb_protocol:echo(Dst).
+-spec echo(opts()) -> rpc_return().
+echo(Opts) -> ovsdb_protocol:echo(Opts).
 %% @equiv echo()
-echo() -> echo(?SERVER).
+echo() -> echo(#{}).
 
 %% @doc Get columns of table
 %%
 %% Reference <a href="https://tools.ietf.org/html/rfc7047#section-4.1.3">4.1.3. Transaction</a>
--spec list_columns(dst(), db_table(), opts()) -> rpc_return().
-list_columns(Dst, Table, Opts) -> ovsdb_protocol:list_columns(Dst, Table, Opts).
-%% @equiv list_columns(ovsdb_client, Table, Opts)
-list_columns(Table, Opts)      -> list_columns(?SERVER, Table, Opts).
+-spec list_columns(db_table(), opts()) -> rpc_return().
+list_columns(Table, Opts) -> ovsdb_protocol:list_columns(Table, Opts).
+%% @equiv list_columns(Table, #{})
+list_columns(Table)      -> list_columns(Table, #{}).
 
-%% Get a list of tables
--spec list_tables(dst(), opts()) -> rpc_return().
-list_tables(Dst, Opts) -> ovsdb_protocol:list_tables(Dst, Opts).
-%% @equiv list_tables(ovsdb_client, Opts)
-list_tables(Opts)      -> list_tables(?SERVER, Opts).
+%% @doc Get a list of tables
+-spec list_tables(opts()) -> rpc_return().
+list_tables(Opts) -> ovsdb_protocol:list_tables(Opts).
+%% @equiv list_tables(#{})
+list_tables()      -> list_tables(#{}).
 
 %% Get contents of database
 -spec dump(db_table(), list()) -> rpc_return().
 dump(Table, Columns) ->
-    dump(?SERVER, Table, Columns).
--spec dump(dst() | db_table(), list() | db_table(), opts() | list()) ->
-    {'error','not_connected' | {'error',_} | {'ok',_}} | {'ok',_}.
-dump(Table, Columns, Opts) when is_binary(Table) ->
-    dump(?SERVER, Table, Columns, Opts);
-dump(Dst, Table, Columns) ->
-%%    237: The call ovsdb_client:dump('ovsdb_client', Table::binary(), Columns::any(), Opts::any()) breaks the contract (dst(), iolist(), [any()], opts()) -> rpc_return()
-    dump(Dst, Table, Columns, #{}).
+    dump(Table, Columns, #{}).
 
-%% Get contents of database
-%%
-%%
--spec dump(dst(), db_table(), list(), opts()) -> rpc_return().
-dump(Dst, Table, [], Opts) -> dump(Dst, Table, "*", Opts);
-dump(Dst, Table, Columns, Opts) ->
-    case transaction(Dst, ovsdb_ops:select(Columns, Table, []), Opts) of
+dump(Table, [], Opts) -> dump(Table, "*", Opts);
+dump(Table, Columns, Opts) when is_binary(Table) ->
+    case transaction(ovsdb_ops:select(Columns, Table, []), Opts) of
         {ok, [#{<<"rows">> := Info}]} ->
             {ok, Info};
         Error ->

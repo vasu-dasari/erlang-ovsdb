@@ -27,92 +27,92 @@
 %% API
 -export([
     list_dbs/1,
-    get_schema/2,
-    transaction/3,
-    cancel/3,
-    monitor/4,
+    get_schema/1,
+    transaction/2,
+    cancel/2,
+    monitor/3,
     monitor_cancel/2,
     lock_ops/3,
     echo/1
 ]).
 
 -export([
-    list_columns/3,
-    list_tables/2,
-    get_content/3
+    list_columns/2,
+    list_tables/1,
+    get_content/2
 ]).
 
 -export([
     process_message/2
     , rpc2map/3]).
 
-list_dbs(Pid) ->
-    gen_server:call(Pid, {send, rpc2map(list_dbs, 0, [])}).
+list_dbs(Opts) ->
+    gen_server:call(get_proc(Opts), {send, rpc2map(list_dbs, 0, [])}).
 
-get_schema(Pid, Opts) ->
-    gen_server:call(Pid, {send, rpc2map(get_schema, 0, [get_database(Pid, Opts)])}).
+get_schema(Opts) ->
+    gen_server:call(get_proc(Opts), {send, rpc2map(get_schema, 0, [get_database(Opts)])}).
 
-transaction(Pid, Operation, Opts) when not is_list(Operation) ->
-    transaction(Pid, Opts, [Operation]);
-transaction(Pid, Operations, Opts) when is_list(Operations) ->
-    gen_server:call(Pid, {send, rpc2map(transact, 0, [get_database(Pid, Opts)] ++ Operations)}).
+transaction(Operation, Opts) when not is_list(Operation) ->
+    transaction(Opts, [Operation]);
+transaction(Operations, Opts) when is_list(Operations) ->
+    gen_server:call(get_proc(Opts), {send, rpc2map(transact, 0, [get_database(Opts)] ++ Operations)}).
 
-cancel(Pid, Operation, Opts) when not is_list(Operation) ->
-    cancel(Pid, Opts, [Operation]);
-cancel(Pid, Operations, Opts) when is_list(Operations) ->
-    gen_server:call(Pid, {send, rpc2map(cancel, 0, [get_database(Pid, Opts)] ++ Operations)}).
+cancel(Operation, Opts) when not is_list(Operation) ->
+    cancel(Opts, [Operation]);
+cancel(Operations, Opts) when is_list(Operations) ->
+    gen_server:call(get_proc(Opts), {send, rpc2map(cancel, 0, [get_database(Opts)] ++ Operations)}).
 
-monitor(Pid, Id, Select, Opts) ->
-    monitor(Pid, self(), Id, Select, Opts).
+monitor(Id, Select, Opts) ->
+    monitor(self(), Id, Select, Opts).
 
-monitor(Pid, FromPid, Id, Table, Opts) when is_binary(Table); is_atom(Table) ->
-    case list_columns(Pid, Table, Opts) of
+monitor(FromPid, Id, Table, Opts) when is_binary(Table); is_atom(Table) ->
+    case list_columns(Table, Opts) of
         {ok, Columns} ->
-            monitor(Pid, FromPid, Id,
+            monitor(FromPid, Id,
                 [#{Table => #{<<"columns">> => Columns}}], Opts
             );
         R -> R
     end;
-monitor(Pid, FromPid, Id, Reqs, Opts) when is_list(Reqs) ->
-    gen_server:call(Pid, {send,
-        rpc2map(monitor, Id, [get_database(Pid, Opts), id_with_pid(Id, FromPid)] ++ Reqs)}).
+monitor(FromPid, Id, Reqs, Opts) when is_list(Reqs) ->
+    gen_server:call(get_proc(Opts), {send,
+        rpc2map(monitor, Id, [get_database(Opts), id_with_pid(Id, FromPid)] ++ Reqs)}).
 
-monitor_cancel(Pid, Id) ->
-    gen_server:call(Pid, {send,
-        rpc2map(monitor_cancel, Id, id_with_pid(Id, self()))}).
+monitor_cancel(Id, Opts) ->
+    gen_server:call(get_proc(Opts), {send,
+        rpc2map(monitor_cancel, Id, [id_with_pid(Id, self())])}).
 
-lock_ops(Pid, Op, Id) when is_list(Id) ->
-    lock_ops(Pid, Op, list_to_binary(Id));
-lock_ops(Pid, Op, Id) when Op == lock; Op == steal; Op == unlock ->
-    gen_server:call(Pid, {lock, Op, Id, self(), rpc2map(Op, Id, [Id])}).
+lock_ops(Op, Id, Opts) when is_list(Id) ->
+    lock_ops(Op, list_to_binary(Id), Opts);
+lock_ops(Op, Id, Opts) when Op == lock; Op == steal; Op == unlock ->
+    gen_server:call(get_proc(Opts), {lock, Op, Id, self(), rpc2map(Op, Id, [Id])}).
 
-echo(Pid) ->
-    gen_server:call(Pid, {send, rpc2map(echo, "echo", [])}).
+echo(Opts) ->
+    gen_server:call(get_proc(Opts), {send, rpc2map(echo, "echo", [])}).
 
-list_columns(Pid, Table, Opts) ->
-    case get_schema(Pid, Opts) of
+list_columns(Table, Opts) ->
+    case get_schema(Opts) of
         {ok, #{<<"tables">> := #{Table := #{<<"columns">> := ColSchema}}}} ->
             {ok, maps:keys(ColSchema)};
         Ret ->
             Ret
     end.
 
-list_tables(Pid, Opts) ->
-    case get_schema(Pid, Opts) of
+list_tables(Opts) ->
+    case get_schema(Opts) of
         {ok, #{<<"tables">> := TableSchema}} ->
             {ok, maps:keys(TableSchema)};
         Ret ->
             Ret
     end.
 
-get_content(Pid, Table, Opts) when is_binary(Table); is_atom(Table) ->
-    case list_columns(Pid, Table, Opts) of
+get_content(Table, Opts) when is_binary(Table); is_atom(Table) ->
+    case list_columns(Table, Opts) of
         {ok, Columns} ->
-            get_content(Pid, [#{Table => #{<<"columns">> => Columns}}], Opts);
+            get_content([#{Table => #{<<"columns">> => Columns}}], Opts);
         R -> R
     end;
-get_content(Pid, Operations, Opts) ->
-    transaction(Pid, Operations, Opts).
+get_content(Operations, Opts) ->
+    transaction(Operations, Opts).
 
 process_message(
         #{<<"method">> := <<"echo">>, <<"id">> := Id, <<"params">> := Params}, State) ->
@@ -184,9 +184,9 @@ rpc2map(Invalid, _, _) ->
     { error, { not_supported, Invalid }}.
 
 id_with_pid(Id, FromPid) ->
-    Id ++ "," ++ erlang:pid_to_list(FromPid).
+    erlang:list_to_binary(Id ++ "," ++ erlang:pid_to_list(FromPid)).
 
-get_database(_Pid, #{database := DbName}) ->
-    DbName;
-get_database(Pid, _) ->
-    ovsdb_client:get_database(Pid).
+get_database(#{database := DbName}) -> DbName;
+get_database(Opts) -> ovsdb_client:get_database(get_proc(Opts)).
+
+get_proc(Opts) -> ovsdb_client:get_proc(Opts).
