@@ -19,7 +19,7 @@ install:
 script:
   - rebar3 compile
   - rebar3 xref
-  - rebar3 eunit
+  - OVSDB_SERVER="tcp:127.0.0.1:6640" rebar3 eunit -v
   - rebar3 dialyzer
   - rebar3 edoc
   - rebar3 cover

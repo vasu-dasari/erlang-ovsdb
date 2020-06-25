@@ -25,19 +25,21 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([ setup/0, teardown/1, sync_call/3, wait_sync_call/1]).
--export([packet/1]).
+-export([]).
 
-protocol_test_() -> {
-    foreach,
-    fun setup/0,
-    fun teardown/1,
-    [
-        fun echo/1,
-        fun list_dbs/1,
-        fun get_schema/1,
-        fun get_schema_version/1
-    ]
-}.
+protocol_test_() ->
+    {setup,
+        fun setup/0,
+        fun teardown/1,
+        fun(S) -> {foreach, fun test_setup/0,
+            [{N, fun() -> F(S) end} || {N, F} <- [
+                {"echo",                fun echo/1},
+                {"list_dbs",            fun list_dbs/1},
+                {"get_schema",          fun get_schema/1},
+                {"get_schema_version",  fun get_schema_version/1}
+            ]]
+        } end
+    }.
 
 setup() ->
     application:ensure_all_started(ovsdb),
@@ -53,39 +55,27 @@ setup() ->
 teardown(_) ->
     application:stop(ovsdb).
 
+test_setup() ->
+    ovs_cmd(init).
+
 echo(Opts) ->
-    {"echo",
-        fun() ->
-            ?assertEqual({ok,[]}, ovsdb_client:echo(Opts))
-        end
-    }.
+    ?assertEqual({ok,[]}, ovsdb_client:echo(Opts)).
 
 list_dbs(Opts) ->
-    {"list_dbs",
-        fun() ->
-            ?assertEqual(
-                {ok,[<<"Open_vSwitch">>,<<"_Server">>]},
-                ovsdb_client:list_dbs(Opts)
-            )
-        end}.
+    ?assertEqual(
+        {ok,[<<"Open_vSwitch">>,<<"_Server">>]},
+        ovsdb_client:list_dbs(Opts)
+    ).
 
 get_schema(Opts) ->
-    {"get_schema",
-        fun() ->
-            ?assertMatch(
-                {ok, #{<<"name">> := <<"Open_vSwitch">>}},
-                ovsdb_client:get_schema(Opts)
-            )
-        end
-    }.
+    ?assertMatch(
+        {ok, #{<<"name">> := <<"Open_vSwitch">>}},
+        ovsdb_client:get_schema(Opts)
+    ).
 
 get_schema_version(Opts) ->
-    {"get_schema_version",
-        fun() ->
-            {ok, Version} = ovsdb_client:get_schema_version(Opts),
-            verify_ovs(schema_version, binary_to_list(Version))
-        end
-    }.
+    {ok, Version} = ovsdb_client:get_schema_version(Opts),
+    verify_ovs(schema_version, binary_to_list(Version)).
 
 %%%===================================================================
 %%% Helper functions
@@ -105,21 +95,8 @@ wait_sync_call(Ref) ->
         {sync_call, Ref, Reply} -> Reply
     end.
 
-packet(echo) -> <<
-    16#7b, 16#22, 16#69, 16#64, 16#22, 16#3a, 16#22, 16#65, 16#63, 16#68, 16#6f, 16#22, 16#2c, 16#22, 16#6d, 16#65,
-    16#74, 16#68, 16#6f, 16#64, 16#22, 16#3a, 16#22, 16#65, 16#63, 16#68, 16#6f, 16#22, 16#2c, 16#22, 16#70, 16#61,
-    16#72, 16#61, 16#6d, 16#73, 16#22, 16#3a, 16#5b, 16#5d, 16#7d
->>;
-packet(echo_reply) -> <<
-	16#7b, 16#22, 16#65, 16#72, 16#72, 16#6f, 16#72, 16#22, 16#3a, 16#6e, 16#75, 16#6c, 16#6c, 16#2c, 16#22, 16#69,
-	16#64, 16#22, 16#3a, 16#22, 16#65, 16#63, 16#68, 16#6f, 16#22, 16#2c, 16#22, 16#72, 16#65, 16#73, 16#75, 16#6c,
-	16#74, 16#22, 16#3a, 16#5b, 16#5d, 16#7d
->>;
-packet(_) ->
-    error(not_reached).
-
 get_server() ->
-    os:getenv("OVSDB_SERVER", application:get_env(ovsdb, eunit_ovsdb_server, "tcp:127.0.0.1:6640")).
+    os:getenv("OVSDB_SERVER", "tcp:10.1.123.20:6640").
 
 -define(ovs_vsctl, "ovs-vsctl --db  " ++ get_server() ++ " ").
 -define(ovsdb_client, "ovsdb-client ").
