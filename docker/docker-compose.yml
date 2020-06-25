@@ -2,7 +2,10 @@ version: '3'
 
 services:
   ovsdb:
-    image: vdasari/erlango:latest
+    build:
+      context: ./
+      dockerfile: Dockerfile.ovsdb
+    image: vdasari/ovsdb:latest
     container_name: ovsdb
     hostname: ovsdb
     volumes:
@@ -19,6 +22,12 @@ services:
     command: start-userspace
     volumes:
         - ${HOME}:${HOME}
+    entrypoint: |
+      bash -c 'bash -s <<EOF
+        /usr/share/openvswitch/scripts/ovs-ctl --ovs-userspace=yes start
+        ovs-vsctl set-manager ptcp:6640
+        sleep infinity
+      EOF'
     networks:
       default_ovsdb_net:
         ipv4_address: 10.1.123.20

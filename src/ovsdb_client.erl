@@ -41,7 +41,7 @@
     code_change/3]).
 
 -export([
-    start/2, start/3,
+    start/2, start/4,
     get_database/0, get_database/1
 ]).
 
@@ -99,18 +99,19 @@ get_proc(_) -> ?SERVER.
 %% Opts = #{database => "DbName"
 %% If a connection is already in polace, it would drop it and restarts new session if endpoint
 %% is different.
--spec start(ip_addr(), inet:port_number(), opts()) -> ok.
-start(IpAddr, Port, Opts) ->
-    gen_server:call(get_proc(Opts), {start, IpAddr, Port, Opts}).
+-spec start(proto_type(), ip_addr(), inet:port_number(), opts()) -> ok.
+start(Type, IpAddr, Port, Opts) ->
+    gen_server:call(get_proc(Opts), {start, Type, IpAddr, Port, Opts}).
 
 %% @doc Starts TCP connection
 %%
 %% Establishes TCP connection with OVSDB server identified by "IpAddr:Port" string format.
-start(IpPortStr, Opts) when is_list(IpPortStr) ->
-    [IpStr, PortStr] = string:split(IpPortStr, ":"),
+start(Ovsdb_Server_Str, Opts) when is_list(Ovsdb_Server_Str) ->
+    [ProtocolStr, IpStr, PortStr] = string:tokens(Ovsdb_Server_Str, ":"),
+    true = (ProtocolStr == "tcp") or (ProtocolStr == "ssl"),
     Port = list_to_integer(PortStr),
     {ok, IpAddr} = inet:ip(IpStr),
-    start(IpAddr, Port, Opts).
+    start(erlang:list_to_atom(ProtocolStr), IpAddr, Port, Opts).
 
 %% @private
 get_database() ->
@@ -348,10 +349,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-process_call({start, IpAddr, Port, Opts}, _, State) ->
-    ?INFO("Starting ovsdb with ~p:~p, Opts: ~p", [IpAddr, Port, Opts]),
+process_call({start, Type, IpAddr, Port, Opts}, _, State) ->
+    ?INFO("Starting ovsdb with ~p:~p:~p, Opts: ~p", [Type, IpAddr, Port, Opts]),
     self() ! connect,
     {reply, ok, State#ovsdb_state{
+        proto = Type,
         ip_addr = IpAddr,
         port = Port,
         database = maps:get(database, Opts, <<>>)

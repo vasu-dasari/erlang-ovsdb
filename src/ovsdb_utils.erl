@@ -58,7 +58,7 @@ to_binstring(Term) ->
 
 %% Script to do sanity test with OVS. This will be in place till docker based tests are implemented.
 unit_test_ovs() ->
-    ok = ovsdb_client:start("10.1.123.20:6640", #{database => <<"Open_vSwitch">>}),
+    ok = ovsdb_client:start("tcp:10.1.123.20:6640", #{database => <<"Open_vSwitch">>}),
     timer:sleep(1000),
 
     {ok,_} = ovsdb_client:list_dbs(),

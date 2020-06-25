@@ -94,6 +94,16 @@ ovsdb_ops() = map() | list()
 
 
 
+### <a name="type-proto_type">proto_type()</a> ###
+
+
+<pre><code>
+proto_type() = tcp | ssl
+</code></pre>
+
+
+
+
 ### <a name="type-rpc_return">rpc_return()</a> ###
 
 
@@ -106,19 +116,19 @@ rpc_return() = {ok, term()} | {error, term()} | not_connected
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#start-3">start/3</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#list_dbs-1">list_dbs/1</a></td><td>Lists available databases.</td></tr><tr><td valign="top"><a href="#list_dbs-0">list_dbs/0</a></td><td>Equivalent to <a href="#list_dbs-1"><tt>list_dbs(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema-1">get_schema/1</a></td><td>Get database schema.</td></tr><tr><td valign="top"><a href="#get_schema-0">get_schema/0</a></td><td>Equivalent to <a href="#get_schema-1"><tt>get_schema(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#transaction-2">transaction/2</a></td><td>Perform OVSDB Transaction.</td></tr><tr><td valign="top"><a href="#transaction-1">transaction/1</a></td><td>Equivalent to <a href="#transaction-2"><tt>transaction(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#cancel-2">cancel/2</a></td><td>Cancel Transaction.</td></tr><tr><td valign="top"><a href="#cancel-1">cancel/1</a></td><td>Equivalent to <a href="#cancel-2"><tt>cancel(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor-3">monitor/3</a></td><td>Monitor.</td></tr><tr><td valign="top"><a href="#monitor-2">monitor/2</a></td><td>Equivalent to <a href="#monitor-3"><tt>monitor(Id, Select, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor_cancel-2">monitor_cancel/2</a></td><td>Cancel Monitor Operation.</td></tr><tr><td valign="top"><a href="#monitor_cancel-1">monitor_cancel/1</a></td><td>Equivalent to <a href="#monitor_cancel-2"><tt>monitor_cancel(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#lock-2">lock/2</a></td><td>Lock Database.</td></tr><tr><td valign="top"><a href="#lock-1">lock/1</a></td><td>Equivalent to <a href="#lock-2"><tt>lock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#steal-2">steal/2</a></td><td>Steal lock.</td></tr><tr><td valign="top"><a href="#steal-1">steal/1</a></td><td>Equivalent to <a href="#steal-2"><tt>steal(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#unlock-2">unlock/2</a></td><td>Unlock database.</td></tr><tr><td valign="top"><a href="#unlock-1">unlock/1</a></td><td>Equivalent to <a href="#unlock-2"><tt>unlock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#echo-1">echo/1</a></td><td>Echo.</td></tr><tr><td valign="top"><a href="#echo-0">echo/0</a></td><td>Equivalent to <a href="#echo-0"><tt>echo()</tt></a>.</td></tr><tr><td valign="top"><a href="#list_columns-2">list_columns/2</a></td><td>Get columns of table.</td></tr><tr><td valign="top"><a href="#list_columns-1">list_columns/1</a></td><td>Equivalent to <a href="#list_columns-2"><tt>list_columns(Table, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_tables-1">list_tables/1</a></td><td>Get a list of tables.</td></tr><tr><td valign="top"><a href="#list_tables-0">list_tables/0</a></td><td>Equivalent to <a href="#list_tables-1"><tt>list_tables(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#dump-2">dump/2</a></td><td></td></tr><tr><td valign="top"><a href="#dump-3">dump/3</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#start-4">start/4</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#list_dbs-1">list_dbs/1</a></td><td>Lists available databases.</td></tr><tr><td valign="top"><a href="#list_dbs-0">list_dbs/0</a></td><td>Equivalent to <a href="#list_dbs-1"><tt>list_dbs(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema-1">get_schema/1</a></td><td>Get database schema.</td></tr><tr><td valign="top"><a href="#get_schema-0">get_schema/0</a></td><td>Equivalent to <a href="#get_schema-1"><tt>get_schema(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#transaction-2">transaction/2</a></td><td>Perform OVSDB Transaction.</td></tr><tr><td valign="top"><a href="#transaction-1">transaction/1</a></td><td>Equivalent to <a href="#transaction-2"><tt>transaction(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#cancel-2">cancel/2</a></td><td>Cancel Transaction.</td></tr><tr><td valign="top"><a href="#cancel-1">cancel/1</a></td><td>Equivalent to <a href="#cancel-2"><tt>cancel(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor-3">monitor/3</a></td><td>Monitor.</td></tr><tr><td valign="top"><a href="#monitor-2">monitor/2</a></td><td>Equivalent to <a href="#monitor-3"><tt>monitor(Id, Select, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor_cancel-2">monitor_cancel/2</a></td><td>Cancel Monitor Operation.</td></tr><tr><td valign="top"><a href="#monitor_cancel-1">monitor_cancel/1</a></td><td>Equivalent to <a href="#monitor_cancel-2"><tt>monitor_cancel(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#lock-2">lock/2</a></td><td>Lock Database.</td></tr><tr><td valign="top"><a href="#lock-1">lock/1</a></td><td>Equivalent to <a href="#lock-2"><tt>lock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#steal-2">steal/2</a></td><td>Steal lock.</td></tr><tr><td valign="top"><a href="#steal-1">steal/1</a></td><td>Equivalent to <a href="#steal-2"><tt>steal(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#unlock-2">unlock/2</a></td><td>Unlock database.</td></tr><tr><td valign="top"><a href="#unlock-1">unlock/1</a></td><td>Equivalent to <a href="#unlock-2"><tt>unlock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#echo-1">echo/1</a></td><td>Echo.</td></tr><tr><td valign="top"><a href="#echo-0">echo/0</a></td><td>Equivalent to <a href="#echo-0"><tt>echo()</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema_version-1">get_schema_version/1</a></td><td>Get OVSDB Schema's version.</td></tr><tr><td valign="top"><a href="#get_schema_version-0">get_schema_version/0</a></td><td>Equivalent to <a href="#get_schema_version-1"><tt>get_schema_version(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_columns-2">list_columns/2</a></td><td>Get columns of table.</td></tr><tr><td valign="top"><a href="#list_columns-1">list_columns/1</a></td><td>Equivalent to <a href="#list_columns-2"><tt>list_columns(Table, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_tables-1">list_tables/1</a></td><td>Get a list of tables.</td></tr><tr><td valign="top"><a href="#list_tables-0">list_tables/0</a></td><td>Equivalent to <a href="#list_tables-1"><tt>list_tables(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#dump-2">dump/2</a></td><td></td></tr><tr><td valign="top"><a href="#dump-3">dump/3</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
 
 ## Function Details ##
 
-<a name="start-3"></a>
+<a name="start-4"></a>
 
-### start/3 ###
+### start/4 ###
 
 <pre><code>
-start(IpAddr::<a href="#type-ip_addr">ip_addr()</a>, Port::<a href="inet.md#type-port_number">inet:port_number()</a>, Opts::<a href="#type-opts">opts()</a>) -&gt; ok
+start(Type::<a href="#type-proto_type">proto_type()</a>, IpAddr::<a href="#type-ip_addr">ip_addr()</a>, Port::<a href="inet.md#type-port_number">inet:port_number()</a>, Opts::<a href="#type-opts">opts()</a>) -&gt; ok
 </code></pre>
 <br />
 
@@ -134,7 +144,7 @@ is different.
 
 ### start/2 ###
 
-`start(IpPortStr, Opts) -> any()`
+`start(Ovsdb_Server_Str, Opts) -> any()`
 
 Starts TCP connection
 
@@ -375,6 +385,25 @@ Reference [4.1.11. Echo](https://tools.ietf.org.md/rfc7047#section-4.1.11)
 `echo() -> any()`
 
 Equivalent to [`echo()`](#echo-0).
+
+<a name="get_schema_version-1"></a>
+
+### get_schema_version/1 ###
+
+<pre><code>
+get_schema_version(Opts::<a href="#type-opts">opts()</a>) -&gt; <a href="#type-rpc_return">rpc_return()</a>
+</code></pre>
+<br />
+
+Get OVSDB Schema's version
+
+<a name="get_schema_version-0"></a>
+
+### get_schema_version/0 ###
+
+`get_schema_version() -> any()`
+
+Equivalent to [`get_schema_version(#{})`](#get_schema_version-1).
 
 <a name="list_columns-2"></a>
 

@@ -1,0 +1,7 @@
+FROM vdasari/erlango:latest
+MAINTAINER vdasari@gmail.com
+
+RUN set -xe \
+    && apt-get update \
+    && apt-get install -y openvswitch-switch \
+    && apt-get purge -y --auto-remove

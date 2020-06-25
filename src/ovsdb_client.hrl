@@ -38,10 +38,11 @@
 -type json_value()  :: jsone:json_value().
 -type db_name() :: iolist() | binary().
 -type ip_addr() :: inet:socket_address() | inet:hostname().
+-type proto_type() :: tcp | ssl.
 
 -record(ovsdb_state, {
     proc = ?SERVER          :: dst(),
-    proto = tcp             :: tcp | ssl,
+    proto = tcp             :: proto_type(),
     ip_addr = 'any'         :: ip_addr(),
     port = 0                :: inet:port_number(),
     timeout = 5000          :: non_neg_integer(),

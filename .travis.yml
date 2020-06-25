@@ -5,8 +5,17 @@ otp_release:
   - 22.0
   - 21.0
 
+services:
+  - docker
+
 install:
   - sudo pip install codecov
+  - sudo apt-get update
+  - sudo apt-get install openvswitch-switch -y
+  - docker run -itd --name ovs --rm -p 6640:6640 --privileged --entrypoint "" vdasari/ovs:latest bash
+  - docker exec -it ovs /usr/share/openvswitch/scripts/ovs-ctl --ovs-userspace=yes start
+  - docker exec -it ovs ovs-vsctl set-manager ptcp:6640
+
 script:
   - rebar3 compile
   - rebar3 xref

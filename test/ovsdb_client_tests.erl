@@ -27,18 +27,15 @@
 -export([ setup/0, teardown/1, sync_call/3, wait_sync_call/1]).
 -export([packet/1]).
 
--define(OVSDB_Server_Ip, {127, 0, 0, 1}).
--define(Server_Port, 20000).
-
 protocol_test_() -> {
     foreach,
     fun setup/0,
     fun teardown/1,
     [
         fun echo/1,
-        fun echo_reply/1,
         fun list_dbs/1,
-        fun get_schema/1
+        fun get_schema/1,
+        fun get_schema_version/1
     ]
 }.
 
@@ -46,68 +43,49 @@ setup() ->
     application:ensure_all_started(ovsdb),
     lager:set_loglevel(lager_console_backend, error),
 
-
-    {ok, ServerSocket} = gen_tcp:listen(?Server_Port,
-        [binary, {reuseaddr, true}, {active, false},
-            {ip, ?OVSDB_Server_Ip}]),
-
-    ok = ovsdb_client:start(?OVSDB_Server_Ip, ?Server_Port,
+    ovs_cmd(init),
+    ok = ovsdb_client:start(get_server(),
         #{database => <<"Open_vSwitch">>}),
-    {ok, ClientSocket} = gen_tcp:accept(ServerSocket),
-    {ovsdb_client, ServerSocket, ClientSocket}.
 
-teardown({_Tid, ServerSocket, ClientSocket}) ->
-    ok = gen_tcp:close(ServerSocket),
-    ok = gen_tcp:close(ClientSocket),
+    verify_ovs(show, "is_connected: true"),
+    #{pid => ovsdb_client}.
+
+teardown(_) ->
     application:stop(ovsdb).
 
-echo({_Pid, _ServerSocket, ClientSocket}) ->
+echo(Opts) ->
     {"echo",
         fun() ->
-            ok = gen_tcp:send(ClientSocket, packet(echo)),
-            {ok, BinMsg} = gen_tcp:recv(ClientSocket, 0),
-            ?assertMatch(BinMsg, packet(echo_reply)),
-            gen_tcp:close(ClientSocket)
-        end}.
-
-echo_reply({_Pid, _ServerSocket, ClientSocket}) ->
-    {"echo_reply",
-        fun() ->
-            Ref = sync_call(ovsdb_client, echo, []),
-            {ok, BinMsg} = gen_tcp:recv(ClientSocket, 0),
-            ok = gen_tcp:send(ClientSocket, packet(echo_reply)),
-            ?assertMatch(BinMsg, packet(echo)),
-            ?assertMatch({ok,[]}, wait_sync_call(Ref)),
-            gen_tcp:close(ClientSocket)
-        end}.
-
-list_dbs({_Pid, _ServerSocket, ClientSocket}) ->
-    {"list_dbs",
-        fun() ->
-            generic_method(ClientSocket, list_dbs, [])
-        end}.
-
-get_schema({_Pid, _ServerSocket, ClientSocket}) ->
-    {"get_schema",
-        fun() ->
-            generic_method(ClientSocket, get_schema, [#{}])
+            ?assertEqual({ok,[]}, ovsdb_client:echo(Opts))
         end
     }.
 
-generic_method(ClientSocket, Method, Args) ->
-    Ref = sync_call(ovsdb_client, Method, Args),
-    {ok, BinMsg} = gen_tcp:recv(ClientSocket, 0),
-    Message = jsone:try_decode(BinMsg),
-    ?assertMatch({ok, #{}, <<>>}, Message),
-    MethodBin = erlang:atom_to_binary(Method, utf8),
-    {ok, #{<<"id">> := Id, <<"method">> := MethodBin}, <<>>} = Message,
-    ok = gen_tcp:send(ClientSocket, jsone:encode(#{
-        <<"id">> => Id,
-        <<"result">> => [<<"Hello">>, <<"World">>],
-        <<"error">> => null
-    })),
-    ?assertMatch({ok, [<<"Hello">>, <<"World">>]}, wait_sync_call(Ref)),
-    gen_tcp:close(ClientSocket).
+list_dbs(Opts) ->
+    {"list_dbs",
+        fun() ->
+            ?assertEqual(
+                {ok,[<<"Open_vSwitch">>,<<"_Server">>]},
+                ovsdb_client:list_dbs(Opts)
+            )
+        end}.
+
+get_schema(Opts) ->
+    {"get_schema",
+        fun() ->
+            ?assertMatch(
+                {ok, #{<<"name">> := <<"Open_vSwitch">>}},
+                ovsdb_client:get_schema(Opts)
+            )
+        end
+    }.
+
+get_schema_version(Opts) ->
+    {"get_schema_version",
+        fun() ->
+            {ok, Version} = ovsdb_client:get_schema_version(Opts),
+            verify_ovs(schema_version, binary_to_list(Version))
+        end
+    }.
 
 %%%===================================================================
 %%% Helper functions
@@ -140,3 +118,31 @@ packet(echo_reply) -> <<
 packet(_) ->
     error(not_reached).
 
+get_server() ->
+    os:getenv("OVSDB_SERVER", application:get_env(ovsdb, eunit_ovsdb_server, "tcp:127.0.0.1:6640")).
+
+-define(ovs_vsctl, "ovs-vsctl --db  " ++ get_server() ++ " ").
+-define(ovsdb_client, "ovsdb-client ").
+
+verify_ovs(Cmd, Match) ->
+    ?assertEqual(ok, lists:foldl(fun
+        (_, [] = Acc) ->
+            OvsCmd = ovs_cmd(Cmd),
+            case re:run(OvsCmd, Match) of
+                {match, _} -> ok;
+                _ -> timer:sleep(1000), Acc
+            end;
+        (_, Acc) ->
+            Acc
+    end, [], lists:seq(1, 10))).
+
+ovs_cmd(Cmd) ->
+    {done, _, Output} = cmd(Cmd),
+    erlang:binary_to_list(Output).
+
+cmd(init) ->
+    erlsh:oneliner(?ovs_vsctl ++ "init");
+cmd(show) ->
+    erlsh:oneliner(?ovs_vsctl ++ "show");
+cmd(schema_version) ->
+    erlsh:oneliner(?ovsdb_client ++ "get-schema-version " ++ get_server()).
