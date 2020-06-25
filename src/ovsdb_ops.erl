@@ -79,7 +79,7 @@ comment(Comment) ->
     #{op => comment, comment => Comment}.
 
 assert(Lock) ->
-    #{op => assert, locsl => Lock}.
+    #{op => assert, lock => Lock}.
 
 %%%===================================================================
 %%% Helpers

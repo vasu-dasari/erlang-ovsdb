@@ -260,6 +260,13 @@ dump(Table, Columns) ->
     dump(Table, Columns, #{}).
 
 dump(Table, [], Opts) -> dump(Table, "*", Opts);
+dump(<<>>, Columns, Opts) ->
+    {ok, Tables} = list_tables(Opts),
+    {ok, lists:foldl(fun
+        (Table, Acc) ->
+            {ok, Content} = dump(Table, Columns, Opts),
+            Acc#{Table => Content}
+    end, #{}, Tables)};
 dump(Table, Columns, Opts) when is_binary(Table) ->
     case transaction(ovsdb_ops:select(Columns, Table, []), Opts) of
         {ok, [#{<<"rows">> := Info}]} ->

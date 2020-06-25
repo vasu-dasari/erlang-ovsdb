@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%
 %% @author Vasu Dasari
-%% @doc Module providing APIs similar to that od ovs-vsctl utility
+%% @doc Module providing APIs in lines similar to that of ovs-vsctl utility
 %%
 %% @end
 %% Created : 17. Jun 2020
@@ -26,6 +26,11 @@
 -include("ovsdb_client.hrl").
 
 %% API
+-export([
+    add_br/2, del_br/2,
+    add_port/3, del_port/3
+]).
+
 -export([vsctl/1, vsctl/2]).
 
 -export([process_vsctl/3]).
@@ -33,8 +38,36 @@
 -export([
 ]).
 
+-type vsctl_returns()       :: ok | error | {ok, term()} | {error, term()}.
+
+%% @doc Add/Modify a bridge to switch
+%%
+-spec add_br(iolist(), ovsdb_client:opts()) -> vsctl_returns().
+add_br(BrName, Opts) ->
+    vsctl(add_br, Opts#{br_name => BrName}).
+
+%% @doc Deletes a bridge to switch
+%%
+-spec del_br(iolist(), ovsdb_client:opts()) -> vsctl_returns().
+del_br(BrName, Opts) ->
+    vsctl(add_br, Opts#{br_name => BrName}).
+
+%% @doc Add/modify port to a bridge
+%%
+-spec add_port(iolist(), iolist(), ovsdb_client:opts()) -> vsctl_returns().
+add_port(BrName, PortName, Opts) ->
+    vsctl(add_port, Opts#{br_name => BrName, port_name => PortName}).
+
+%% @doc Add/modify port to a bridge
+%%
+-spec del_port(iolist(), iolist(), ovsdb_client:opts()) -> vsctl_returns().
+del_port(BrName, PortName, Opts) ->
+    vsctl(del_port, Opts#{br_name => BrName, port_name => PortName}).
+
+%% @private
 vsctl(Cmd) -> vsctl(Cmd, #{}).
 
+%% @private
 vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
     BrInfo = case ovsdb_client:transaction(
         ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]), Opts) of
@@ -62,6 +95,7 @@ vsctl(Cmd, _) ->
     ?INFO("~p: Not supported", [Cmd]),
     not_yet.
 
+%% @private
 process_vsctl(Cmd, Opts, State) ->
     ?INFO("~p: Opts ~p", [Cmd, Opts]),
     State.
@@ -83,7 +117,7 @@ bridge_cmd(del_br, #{<<"_uuid">> := Br_Uuid}, #{br_name := BrName} = Opts) ->
         _ -> [Bridges]
     end,
 
-    ovsdb_client:transaction([
+    {ok, _} = ovsdb_client:transaction([
         ovsdb_ops:delete(<<"Bridge">>, [{name, '==', BrName}]),
         ovsdb_ops:update(<<"Open_vSwitch">>,
             [{<<"_uuid">>, <<"==">> ,Open_vSwitch_Uuid}],
@@ -92,7 +126,8 @@ bridge_cmd(del_br, #{<<"_uuid">> := Br_Uuid}, #{br_name := BrName} = Opts) ->
             [{<<"_uuid">>, <<"==">> ,Open_vSwitch_Uuid}],
             [{<<"next_cfg">>, <<"+=">>, 1}]),
         ovsdb_ops:commit(true)
-    ], Opts);
+    ], Opts),
+    ok;
 
 bridge_cmd(add_br, BrInfo, #{br_name := BrName} = Opts) when map_size(BrInfo) == 0 ->
 
@@ -108,7 +143,7 @@ bridge_cmd(add_br, BrInfo, #{br_name := BrName} = Opts) when map_size(BrInfo) ==
         _ -> [Bridges]
     end,
 
-    ovsdb_client:transaction([
+    {ok, _} = ovsdb_client:transaction([
         ovsdb_ops:insert(<<"Interface">>, Interface, <<"interface_uuid">>),
         ovsdb_ops:insert(<<"Port">>, Port, <<"port_uuid">>),
         ovsdb_ops:insert(<<"Bridge">>, Bridge, <<"bridge_uuid">>),
@@ -119,11 +154,12 @@ bridge_cmd(add_br, BrInfo, #{br_name := BrName} = Opts) when map_size(BrInfo) ==
             [{<<"_uuid">>, <<"==">>, Open_vSwitch_Uuid}],
             [{<<"next_cfg">>, <<"+=">>, 1}]),
         ovsdb_ops:commit(true)
-    ], Opts);
+    ], Opts),
+    ok;
 
 bridge_cmd(_Op, _PortInfo, _Opts) ->
     ?INFO("Unhandled ~p", [{_Op, _PortInfo, _Opts}]),
-    {ok, #{}}.
+    ok.
 
 port_cmd(Op, #{<<"ports">> := [<<"uuid">>, _] = Ports} = BrInfo, PortInfo, Opts) ->
     port_cmd(Op, BrInfo#{<<"ports">> := [<<"set">>, [Ports]]}, PortInfo, Opts);
@@ -135,7 +171,7 @@ port_cmd(add_port,
 
     Interface = #{name => PortName},
     Port = #{name => PortName, interfaces => [<<"named-uuid">>, <<"interface_uuid">>]},
-    ovsdb_client:transaction([
+    {ok,_} = ovsdb_client:transaction([
         ovsdb_ops:insert(<<"Interface">>, Interface, <<"interface_uuid">>),
         ovsdb_ops:insert(<<"Port">>, Port, <<"port_uuid">>),
         ovsdb_ops:update(<<"Bridge">>,
@@ -145,14 +181,16 @@ port_cmd(add_port,
             [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
             [{<<"next_cfg">>, <<"+=">>, 1}]),
         ovsdb_ops:commit(true)
-    ], Opts);
+    ], Opts),
+    ok;
+
 
 port_cmd(del_port,
         #{<<"_uuid">> := Br_Uuid, <<"ports">> := [<<"set">>, Ports]},
         #{<<"_uuid">> := Port_Uuid},
         #{port_name := PortName} = Opts) ->
 
-    ovsdb_client:transaction([
+    {ok,_} = ovsdb_client:transaction([
         ovsdb_ops:delete(<<"Port">>, [{name, '==', PortName}]),
         ovsdb_ops:update(<<"Bridge">>,
             [{<<"_uuid">>, <<"==">> ,Br_Uuid}],
@@ -161,11 +199,12 @@ port_cmd(del_port,
             [{<<"_uuid">>, <<"==">> ,get_Open_vSwitch_Uuid(Opts)}],
             [{<<"next_cfg">>, <<"+=">>, 1}]),
         ovsdb_ops:commit(true)
-    ], Opts);
+    ], Opts),
+    ok;
 
 port_cmd(_Op, _BrInfo, _PortInfo, _Opts) ->
     ?INFO("Unhandled ~p", [{_Op, _BrInfo, _PortInfo, _Opts}]),
-    {ok, #{}}.
+    ok.
 
 get_Open_vSwitch_Uuid(Opts) ->
     {ok, [#{<<"_uuid">> := Open_vSwitch_Uuid}]} =

@@ -24,8 +24,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--export([ setup/0, teardown/1, sync_call/3, wait_sync_call/1]).
--export([]).
+-export([setup/0, teardown/1, test_setup/0, verify_ovs/2, ovs_cmd/1]).
+-export([sync_call/3, wait_sync_call/1]).
 
 protocol_test_() ->
     {setup,
@@ -33,10 +33,16 @@ protocol_test_() ->
         fun teardown/1,
         fun(S) -> {foreach, fun test_setup/0,
             [{N, fun() -> F(S) end} || {N, F} <- [
-                {"echo",                fun echo/1},
-                {"list_dbs",            fun list_dbs/1},
-                {"get_schema",          fun get_schema/1},
-                {"get_schema_version",  fun get_schema_version/1}
+                {"echo",                        fun echo/1}
+                ,{"list_dbs",                   fun list_dbs/1}
+                ,{"get_schema",                 fun get_schema/1}
+                ,{"get_schema_version",         fun get_schema_version/1}
+                ,{"list_tables",                fun list_tables/1}
+                ,{"list_columns",               fun list_columns/1}
+                ,{"transaction",                fun transaction/1}
+                ,{"dump entire db",             fun dump_db/1}
+                ,{"dump a table",               fun dump_table_db/1}
+                ,{"dump a column of a table ",  fun dump_table_column_db/1}
             ]]
         } end
     }.
@@ -46,8 +52,7 @@ setup() ->
     lager:set_loglevel(lager_console_backend, error),
 
     ovs_cmd(init),
-    ok = ovsdb_client:start(get_server(),
-        #{database => <<"Open_vSwitch">>}),
+    ovsdb_utils:ovs_connect(),
 
     verify_ovs(show, "is_connected: true"),
     #{pid => ovsdb_client}.
@@ -77,6 +82,46 @@ get_schema_version(Opts) ->
     {ok, Version} = ovsdb_client:get_schema_version(Opts),
     verify_ovs(schema_version, binary_to_list(Version)).
 
+list_tables(Opts) ->
+    Result = ovsdb_client:list_tables(Opts),
+    ?assertMatch({ok, _}, Result),
+    {ok, Tables} = Result,
+    ?assertEqual(true, lists:member(<<"Bridge">>, Tables)).
+
+list_columns(Opts) ->
+    Result = ovsdb_client:list_columns(<<"Bridge">>, Opts),
+    ?assertMatch({ok, _}, Result),
+    {ok, Columns} = Result,
+    ?assertEqual(true, lists:member(<<"datapath_id">>, Columns)).
+
+transaction(Opts) ->
+    ?assertMatch(
+        {ok, [#{<<"rows">> := [#{<<"bridges">> := _}]}]},
+        ovsdb_client:transaction([ovsdb_ops:select([<<"_uuid">>, <<"bridges">>], <<"Open_vSwitch">>, [])], Opts)
+    ),
+    ?assertMatch(
+        {ok, [#{<<"rows">> := _}]},
+        ovsdb_client:transaction([ovsdb_ops:select([], <<"Open_vSwitch">>, [])], Opts)
+    ).
+
+dump_db(Opts) ->
+    ?assertMatch(
+        {ok, #{<<"Open_vSwitch">> := _, <<"Bridge">> := _}},
+        ovsdb_client:dump(<<>>, [], Opts)
+    ).
+
+dump_table_db(Opts) ->
+    ?assertMatch(
+        {ok, [#{<<"ovs_version">> := _}]},
+        ovsdb_client:dump(<<"Open_vSwitch">>, [], Opts)
+    ).
+
+dump_table_column_db(Opts) ->
+    ?assertMatch(
+        {ok, [#{<<"ovs_version">> := _}]},
+        ovsdb_client:dump(<<"Open_vSwitch">>, [<<"ovs_version">>], Opts)
+    ).
+
 %%%===================================================================
 %%% Helper functions
 %%%===================================================================
@@ -95,10 +140,7 @@ wait_sync_call(Ref) ->
         {sync_call, Ref, Reply} -> Reply
     end.
 
-get_server() ->
-    os:getenv("OVSDB_SERVER", "tcp:10.1.123.20:6640").
-
--define(ovs_vsctl, "ovs-vsctl --db  " ++ get_server() ++ " ").
+-define(ovs_vsctl, "ovs-vsctl --db  " ++ ovsdb_utils:get_server() ++ " ").
 -define(ovsdb_client, "ovsdb-client ").
 
 verify_ovs(Cmd, Match) ->
@@ -121,5 +163,9 @@ cmd(init) ->
     erlsh:oneliner(?ovs_vsctl ++ "init");
 cmd(show) ->
     erlsh:oneliner(?ovs_vsctl ++ "show");
+cmd(list_br) ->
+    erlsh:oneliner(?ovs_vsctl ++ "list-br");
+cmd({list_ports, BrName}) ->
+    erlsh:oneliner(?ovs_vsctl ++ "list-ports " ++ BrName);
 cmd(schema_version) ->
-    erlsh:oneliner(?ovsdb_client ++ "get-schema-version " ++ get_server()).
+    erlsh:oneliner(?ovsdb_client ++ "get-schema-version " ++ ovsdb_utils:get_server()).
