@@ -59,6 +59,7 @@
 ]).
 
 -export([
+    get_schema_version/0, get_schema_version/1,
     list_columns/1, list_columns/2,
     list_tables/0, list_tables/1,
     dump/2, dump/3
@@ -227,6 +228,16 @@ unlock(Id) -> unlock(Id, #{}).
 echo(Opts) -> ovsdb_protocol:echo(Opts).
 %% @equiv echo()
 echo() -> echo(#{}).
+
+%% @doc Get OVSDB Schema's version
+-spec get_schema_version(opts()) -> rpc_return().
+get_schema_version(Opts) ->
+    case get_schema(Opts) of
+        {ok, #{ <<"version">> := Version}} -> {ok,Version};
+        R -> R
+    end.
+%% @equiv get_schema_version(#{})
+get_schema_version()      -> get_schema_version(#{}).
 
 %% @doc Get columns of table
 %%
