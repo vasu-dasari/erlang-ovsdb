@@ -36,7 +36,7 @@
 
 -type dst() :: pid() | port() | (RegName :: atom()) | {RegName :: atom(), Node :: node()}.
 -type json_value()  :: jsone:json_value().
--type db_name() :: iolist() | binary().
+-type db_name() :: unicode:chardata().
 -type ip_addr() :: inet:socket_address() | inet:hostname().
 -type proto_type() :: tcp | ssl.
 

@@ -24,10 +24,11 @@
 
 -include("logger.hrl").
 %% API
--export([pretty_print/1, backtrace/0, whocalledme/0, to_binstring/1]).
+-export([pretty_print/1, backtrace/0, whocalledme/0, to_binstring/1, uuid/2]).
 -export([
     unit_test_ovs/0
-    , ovs_connect/0, get_server/0]).
+    , ovs_connect/0
+    , get_server/0]).
 
 pretty_print(Item) ->
     io_lib:format("~s",[io_lib_pretty:print(Item)]).
@@ -55,6 +56,13 @@ to_binstring(Term) when is_number(Term) ->
     erlang:integer_to_binary(Term);
 to_binstring(Term) ->
     Term.
+
+-spec uuid(atom(), iolist()|binary()) -> binary().
+uuid(NameSpace, String) when is_atom(NameSpace), is_binary(String) ->
+    list_to_binary(string:join(
+        [erlang:atom_to_list(NameSpace)] ++
+        string:tokens(
+            erlang:binary_to_list(String), "-"), "_")).
 
 ovs_connect() ->
     ok = ovsdb_client:start(get_server(), #{database => <<"Open_vSwitch">>}).

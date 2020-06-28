@@ -24,6 +24,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-export([del_bond_iface/1, del_bond/1]).
+
 vsctl_test_() ->
     {setup,
         fun ovsdb_client_tests:setup/0,
@@ -34,6 +36,10 @@ vsctl_test_() ->
                 ,{"add_port",                   fun add_port/1}
                 ,{"del_port",                   fun del_port/1}
                 ,{"del_br",                     fun del_br/1}
+                ,{"add_bond",                   fun add_bond/1}
+                ,{"add_bond_iface",             fun add_bond_iface/1}
+                ,{"del_bond_iface",             fun del_bond_iface/1}
+                ,{"del_bond",                   fun del_bond/1}
             ]]
         } end
     }.
@@ -43,9 +49,11 @@ add_br(Opts) ->
         ok,
         ovsdb_vsctl:add_br(<<"br1">>, Opts)
     ),
-    ovsdb_client_tests:verify_ovs(list_br, "br1").
+    ovsdb_client_tests:verify_ovs(list_br, "br1"),
+    ovsdb_client_tests:ovs_cmd({vsctl, "del-br br1"}).
 
 del_br(Opts) ->
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-br br1 -- set Bridge br1 datapath_type=netdev"}),
     ?assertEqual(
         ok,
         ovsdb_vsctl:del_br(<<"br1">>, Opts)
@@ -65,4 +73,54 @@ del_port(Opts) ->
         ovsdb_vsctl:del_port(<<"br1">>, <<"br1-eth1">>, Opts)
     ),
     ovsdb_client_tests:verify_ovs({list_ports, "br1"}, "").
+
+add_bond(Opts) ->
+    ?assertEqual(
+        ok,
+        ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts)
+    ),
+    ?assertEqual(
+        ok,
+        ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond2">>, [<<"bond2-eth1">>, <<"bond2-eth2">>], Opts)
+    ),
+    ovsdb_client_tests:verify_ovs({list_ports, "br1"}, "br1-bond1br1-bond2"),
+    ovsdb_client_tests:verify_ovs({list_ifaces, "br1"}, "bond1-eth1bond1-eth2bond2-eth1bond2-eth2"),
+    ovsdb_client_tests:ovs_cmd({vsctl, "del-br br1"}).
+
+add_bond_iface(Opts) ->
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-br br1 -- set Bridge br1 datapath_type=netdev"}),
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-bond br1 br1-bond1 bond1-eth1 bond1-eth2"}),
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_bond_iface(<<"br1">>, <<"br1-bond">>, <<"bond1-eth3">>, Opts)),
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_bond_iface(<<"br1">>, <<"br1-bond">>, [<<"bond1-eth3">>, <<"bond1-eth4">>], Opts)),
+    ovsdb_client_tests:verify_ovs({list_ports, "br1"}, "br1-bond"),
+    ovsdb_client_tests:verify_ovs({list_ifaces, "br1"}, "bond1-eth3bond1-eth4"),
+    ovsdb_client_tests:ovs_cmd({vsctl, "del-br br1"}).
+
+del_bond_iface(Opts) ->
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-br br1 -- set Bridge br1 datapath_type=netdev"}),
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-bond br1 br1-bond1 bond1-eth1 bond1-eth2 bond1-eth3 bond1-eth4"}),
+    ?assertEqual(ok,
+        ovsdb_vsctl:del_bond_iface(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth2">>, <<"bond1-eth3">>], Opts),
+        "API Delete multiple member link"
+    ),
+    ?assertEqual(ok,
+        ovsdb_vsctl:del_bond_iface(<<"br1">>, <<"br1-bond1">>, <<"bond1-eth4">>, Opts),
+        "API Delete single member link"
+    ),
+    ?assertNotEqual(ok,
+        ovsdb_vsctl:del_bond_iface(<<"br1">>, <<"br1-bond1">>, <<"bond1-eth1">>, Opts),
+        "Cannot delete last interface in a bond"
+    ),
+    ovsdb_client_tests:verify_ovs({list_ifaces, "br1"}, "bond1-eth1"),
+    ovsdb_client_tests:ovs_cmd({vsctl, "del-br br1"}).
+
+del_bond(Opts) ->
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-br br1 -- set Bridge br1 datapath_type=netdev"}),
+    ovsdb_client_tests:ovs_cmd({vsctl, "add-bond br1 br1-bond1 bond1-eth1 bond1-eth2"}),
+    ?assertEqual(ok,
+        ovsdb_vsctl:del_bond(<<"br1">>, <<"br1-bond1">>, Opts)),
+    ovsdb_client_tests:verify_ovs({list_ports, "br1"}, ""),
+    ovsdb_client_tests:ovs_cmd({vsctl, "del-br br1"}).
 

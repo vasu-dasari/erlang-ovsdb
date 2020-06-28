@@ -144,16 +144,27 @@ wait_sync_call(Ref) ->
 -define(ovsdb_client, "ovsdb-client ").
 
 verify_ovs(Cmd, Match) ->
-    ?assertEqual(ok, lists:foldl(fun
+    Ret = lists:foldl(fun
         (_, [] = Acc) ->
-            OvsCmd = ovs_cmd(Cmd),
-            case re:run(OvsCmd, Match) of
+            case re:run(ovs_cmd(Cmd), Match) of
                 {match, _} -> ok;
-                _ -> timer:sleep(1000), Acc
+                _ -> timer:sleep(100), Acc
             end;
         (_, Acc) ->
             Acc
-    end, [], lists:seq(1, 10))).
+    end, [], lists:seq(1, 10)),
+    case Ret == ok of
+        false ->
+            OvsOut = ovs_cmd(Cmd),
+            MatchResult = re:run(OvsOut, Match),
+            ?assertMatch(
+                {match, _},
+                MatchResult,
+                lists:flatten(io_lib:format("Got ~p, expecting ~p", [OvsOut, Match]))
+            );
+        _ ->
+            ok
+    end.
 
 ovs_cmd(Cmd) ->
     {done, _, Output} = cmd(Cmd),
@@ -167,5 +178,11 @@ cmd(list_br) ->
     erlsh:oneliner(?ovs_vsctl ++ "list-br");
 cmd({list_ports, BrName}) ->
     erlsh:oneliner(?ovs_vsctl ++ "list-ports " ++ BrName);
+cmd({list_ifaces, BrName}) ->
+    erlsh:oneliner(?ovs_vsctl ++ "list-ifaces " ++ BrName);
 cmd(schema_version) ->
-    erlsh:oneliner(?ovsdb_client ++ "get-schema-version " ++ ovsdb_utils:get_server()).
+    erlsh:oneliner(?ovsdb_client ++ "get-schema-version " ++ ovsdb_utils:get_server());
+cmd({vsctl, Cmd}) when is_list(Cmd) ->
+    erlsh:oneliner(?ovs_vsctl ++ Cmd);
+cmd({ovsdb, Cmd}) when is_list(Cmd) ->
+    erlsh:oneliner(?ovsdb_client ++ Cmd ++ " " ++ ovsdb_utils:get_server()).

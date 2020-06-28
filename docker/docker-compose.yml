@@ -20,6 +20,7 @@ services:
     container_name: ovs1
     hostname: ovs1
     command: start-userspace
+    privileged: true
     volumes:
         - ${HOME}:${HOME}
     entrypoint: |
@@ -37,6 +38,7 @@ services:
     container_name: ovs2
     hostname: ovs2
     command: start-userspace
+    privileged: true
     volumes:
         - ${HOME}:${HOME}
     privileged: true

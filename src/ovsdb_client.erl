@@ -74,13 +74,14 @@
 -export_type([opts/0, rpc_return/0]).
 
 -type rpc_return() :: {ok, term()} | {error, term()} | not_connected.
--type db_table()    :: iolist() | binary().
+-type db_table()    :: unicode:chardata().
 -type ovsdb_ops()   :: map() | list().
 -type opts()        :: #{
             pid => dst(),
             database => db_name(),
-            br_name => iolist(),
-            port_name => iolist()
+            br_name => unicode:chardata(),
+            port_name => unicode:chardata(),
+            _ => term()
         }.
 
 %%%===================================================================

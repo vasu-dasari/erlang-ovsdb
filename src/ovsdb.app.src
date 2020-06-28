@@ -7,6 +7,7 @@
         kernel,
         stdlib,
         ssl,
+        runtime_tools,
         lager,
         jsone
     ]},

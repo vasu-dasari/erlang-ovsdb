@@ -28,7 +28,7 @@ This Module is the primary interface to OVSDB library
 
 
 <pre><code>
-db_name() = iolist() | binary()
+db_name() = <a href="unicode.md#type-chardata">unicode:chardata()</a>
 </code></pre>
 
 
@@ -38,7 +38,7 @@ db_name() = iolist() | binary()
 
 
 <pre><code>
-db_table() = iolist() | binary()
+db_table() = <a href="unicode.md#type-chardata">unicode:chardata()</a>
 </code></pre>
 
 
@@ -78,7 +78,7 @@ json_value() = <a href="jsone.md#type-json_value">jsone:json_value()</a>
 
 
 <pre><code>
-opts() = #{pid =&gt; <a href="#type-dst">dst()</a>, database =&gt; <a href="#type-db_name">db_name()</a>, br_name =&gt; iolist(), port_name =&gt; iolist()}
+opts() = #{pid =&gt; <a href="#type-dst">dst()</a>, database =&gt; <a href="#type-db_name">db_name()</a>, br_name =&gt; <a href="unicode.md#type-chardata">unicode:chardata()</a>, port_name =&gt; <a href="unicode.md#type-chardata">unicode:chardata()</a>, term() =&gt; term()}
 </code></pre>
 
 
