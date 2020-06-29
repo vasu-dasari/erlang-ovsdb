@@ -44,45 +44,80 @@
 
 %% @doc Add/Modify a bridge to switch
 %%
+%% This is quivalent to
+%%    $ ovs-vsctl --may-exist add-br br1 ...
+%% Options Supported:
+%%      datapath_id
+%%      datapath_type
+%%      fail_mode
+%%      protocols
 -spec add_br(unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
 add_br(BrName, Opts) ->
     vsctl(add_br, Opts#{br_name => BrName}).
 
 %% @doc Deletes a bridge to switch
 %%
+%% This is quivalent to
+%%    $ ovs-vsctl del-br br1 ...
 -spec del_br(unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
 del_br(BrName, Opts) ->
-    vsctl(add_br, Opts#{br_name => BrName}).
+    vsctl(del_br, Opts#{br_name => BrName}).
 
 %% @doc Add/modify port to a bridge
 %%
+%% This is quivalent to
+%%    $ ovs-vsctl add-port br1 br1-eth1
 %% Bridge of type netdev will be created if it does not exists
 -spec add_port(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
 add_port(BrName, PortName, Opts) ->
-    vsctl(add_port, Opts#{br_name => BrName, port_name => PortName}).
+    vsctl(add_port, Opts#{br_name => BrName, port_name => PortName, iface_list => [PortName]}).
 
-%% @doc Add/modify port to a bridge
+%% @doc Delete port from a bridge
 %%
+%% This is quivalent to
+%%    $ ovs-vsctl del-port br1 br1-eth1
 -spec del_port(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
 del_port(BrName, PortName, Opts) ->
-    vsctl(del_port, Opts#{br_name => BrName, port_name => PortName}).
+    vsctl(del_port, Opts#{br_name => BrName, port_name => PortName, iface_list => [PortName]}).
 
 %% @doc Create or modify bond interface
 %%
+%% This is quivalent to
+%%    $ ovs-vsctl --may-exist add-bond br1 br1-bond1 bond1-eth1 bond2-eth2...
+%% Options Supported:
+%%      lacp
+%%      bond_mode
 -spec add_bond(unicode:chardata(), unicode:chardata(), list(), ovsdb_client:opts()) -> ovsdb_client:rpc_return().
 add_bond(BrName, BondName, IfaceList, Opts) ->
-    bond(add_bond, BrName, BondName, IfaceList, Opts).
+    bond(add_port, BrName, BondName, IfaceList, Opts).
 
+%% @doc Add an interface to a bond
+%%
+%% This is equivalent to:
+%%    $ ovs-vsctl add-bond-iface br1 br1-eth1
+-spec add_bond_iface(unicode:chardata(), unicode:chardata(),
+        list() | unicode:chardata(), ovsdb_client:opts()) -> ovsdb_client:rpc_return().
 add_bond_iface(BrName, BondName, Iface, Opts) when is_binary(Iface) ->
     add_bond_iface(BrName, BondName, [Iface], Opts);
 add_bond_iface(BrName, BondName, IfaceList, Opts) ->
-    bond(add_bond,  BrName, BondName, IfaceList, Opts).
+    bond(add_port,  BrName, BondName, IfaceList, Opts).
 
+%% @doc Delete an interface to a bond
+%%
+%% This is equivalent to:
+%%    $ ovs-vsctl del-bond-iface br1 br1-eth1
+-spec del_bond_iface(unicode:chardata(), unicode:chardata(),
+        list() | unicode:chardata(), ovsdb_client:opts()) -> ovsdb_client:rpc_return().
 del_bond_iface(BrName, BondName, Iface, Opts) when is_binary(Iface) ->
     del_bond_iface(BrName, BondName, [Iface], Opts);
 del_bond_iface(BrName, BondName, IfaceList, Opts) ->
     bond(del_bond_iface,  BrName, BondName, IfaceList, Opts).
 
+%% @doc Delete a bond port
+%%
+%% This is equivalent to:
+%%    $ ovs-vsctl del-bond br1 br1-bond1
+-spec del_bond(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> ovsdb_client:rpc_return().
 del_bond(BrName, BondName, Opts) ->
     del_port(BrName, BondName, Opts).
 
@@ -105,7 +140,7 @@ vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
     end,
     do_vsctl(Op, BrInfo, Opts);
 vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
-    when Op == add_port; Op == del_port; Op == add_bond; Op == del_bond_iface  ->
+    when Op == add_port; Op == del_port; Op == del_bond_iface  ->
 
     Request = [
         ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]),
@@ -131,8 +166,11 @@ vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
     end, #{<<"Bridge">> => #{}, <<"Port">> => #{}, <<"Interface">> => #{}}, lists:zip(Request, Response)),
 
     case {maps:get(<<"Bridge">>, DbInfo), maps:get(<<"Port">>, DbInfo)}  of
-        {B, _} when (map_size(B) == 0) and (Op == add_port orelse Op == add_bond) ->
+        {B, _} when (map_size(B) == 0) and (Op == add_port) ->
             vsctl(add_br, Opts),
+            vsctl(Op, Opts);
+        {_, P} when (map_size(P) == 0) and (Op == add_port) ->
+            do_vsctl(Op, DbInfo, Opts),
             vsctl(Op, Opts);
         {B, P} when ((map_size(B) == 0) or (map_size(P) == 0)) and ((Op == del_port) or (Op == del_bond_iface))->
             {error, invalid_configuration};
@@ -151,30 +189,24 @@ process_vsctl(Cmd, Opts, State) ->
 
 do_vsctl(Op, BrInfo, Opts) when Op == add_br; Op == del_br ->
     bridge_cmd(Op, BrInfo, Opts);
-do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo},
-        Opts) when Op == add_port; Op == del_port ->
-    port_cmd(Op, BrInfo, PortInfo, Opts);
 do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo, <<"Interface">> := IfaceList},
-        Opts) when Op == add_bond; Op == del_bond_iface ->
+        Opts) when Op == add_port; Op == del_port ->
+    port_cmd(Op, BrInfo, PortInfo, IfaceList,  Opts);
+do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo, <<"Interface">> := IfaceList},
+        Opts) when Op == del_bond_iface ->
     bond_cmd(Op, BrInfo, PortInfo, IfaceList, Opts);
 do_vsctl(_Op, _BrInfo, _Opts) ->
     ok.
 
 bridge_cmd(del_br, #{<<"_uuid">> := Br_Uuid}, #{br_name := BrName} = Opts) ->
-
-    {ok, [#{<<"_uuid">> := Open_vSwitch_Uuid, <<"bridges">> := Bridges}]} =
+    {ok, [#{<<"_uuid">> := Open_vSwitch_Uuid} = OvSInfo]} =
         ovsdb_client:dump(<<"Open_vSwitch">>, ['_uuid', bridges]),
-
-    BridgesSet = case Bridges of
-        [<<"set">>, B] -> B;
-        _ -> [Bridges]
-    end,
 
     {ok, _} = ovsdb_client:transaction([
         ovsdb_ops:delete(<<"Bridge">>, [{name, '==', BrName}]),
         ovsdb_ops:update(<<"Open_vSwitch">>,
             [{<<"_uuid">>, <<"==">> ,Open_vSwitch_Uuid}],
-            #{bridges => [set, BridgesSet -- [Br_Uuid]]}),
+            #{bridges => [set, get_set(OvSInfo, <<"bridges">>) -- [Br_Uuid]]}),
         ovsdb_ops:mutate(<<"Open_vSwitch">>,
             [{<<"_uuid">>, <<"==">> ,Open_vSwitch_Uuid}],
             [{<<"next_cfg">>, <<"+=">>, 1}]),
@@ -183,85 +215,61 @@ bridge_cmd(del_br, #{<<"_uuid">> := Br_Uuid}, #{br_name := BrName} = Opts) ->
     ok;
 
 bridge_cmd(add_br, BrInfo, #{br_name := BrName} = Opts) when map_size(BrInfo) == 0 ->
-
-    {ok, [#{<<"_uuid">> := Open_vSwitch_Uuid, <<"bridges">> := Bridges}]} =
+    {ok, [#{<<"_uuid">> := Open_vSwitch_Uuid} = OvSInfo]} =
         ovsdb_client:dump(<<"Open_vSwitch">>, ['_uuid', bridges]),
 
-    Interface = #{name => BrName, type => <<"internal">>},
-    Port = #{name => BrName, interfaces => [<<"named-uuid">>, <<"interface_uuid">>]},
-    Bridge = #{name => BrName, ports => [<<"named-uuid">>, <<"port_uuid">>], protocols => <<"OpenFlow10">>},
+    InterfaceOps = ovsdb_ops:insert(<<"Interface">>,
+        #{name => BrName, type => <<"internal">>},
+        ovsdb_utils:uuid(interfaces, BrName)),
 
-    BridgesSet = case Bridges of
-        [<<"set">>, B] -> B;
-        _ -> [Bridges]
-    end,
+    PortOps = ovsdb_ops:insert(<<"Port">>,
+        #{name => BrName, interfaces => [<<"named-uuid">>, ovsdb_utils:uuid(interfaces, BrName)]},
+        ovsdb_utils:uuid(port, BrName)),
 
-    {ok, _} = ovsdb_client:transaction([
-        ovsdb_ops:insert(<<"Interface">>, Interface, <<"interface_uuid">>),
-        ovsdb_ops:insert(<<"Port">>, Port, <<"port_uuid">>),
-        ovsdb_ops:insert(<<"Bridge">>, Bridge, <<"bridge_uuid">>),
-        ovsdb_ops:update(<<"Open_vSwitch">>,
-            [{<<"_uuid">>, <<"==">>, Open_vSwitch_Uuid}],
-            #{bridges => [set, BridgesSet ++ [[<<"named-uuid">>, <<"bridge_uuid">>]]]}),
+    BaseBrInfo = #{name => BrName, ports => [<<"named-uuid">>, ovsdb_utils:uuid(port, BrName)]},
+
+    NewBrInfo = get_extra_config(bridge, BaseBrInfo, Opts),
+
+    BridgeOps = ovsdb_ops:insert(<<"Bridge">>,
+        maps:merge(NewBrInfo, BaseBrInfo), ovsdb_utils:uuid(bridge, BrName)),
+
+    OvS_Ops = ovsdb_ops:update(<<"Open_vSwitch">>,
+        [{<<"_uuid">>, <<"==">>, Open_vSwitch_Uuid}],
+        #{bridges => [set, [[<<"named-uuid">>, ovsdb_utils:uuid(bridge, BrName)] | get_set(OvSInfo, <<"bridges">>)]]}),
+
+    Request = get_wait_ops(<<"Open_vSwitch">>, OvSInfo, #{<<"bridges">> => ""}) ++
+        [InterfaceOps, PortOps, BridgeOps, OvS_Ops] ++ [
         ovsdb_ops:mutate(<<"Open_vSwitch">>,
             [{<<"_uuid">>, <<"==">>, Open_vSwitch_Uuid}],
             [{<<"next_cfg">>, <<"+=">>, 1}]),
         ovsdb_ops:commit(true)
-    ], Opts),
-    ok;
+    ],
+    transaction(Request);
+
+bridge_cmd(add_br, #{<<"_uuid">> := Br_Uuid} = BrInfo, Opts) ->
+    case get_extra_config(bridge, BrInfo, Opts) of
+        NewBrInfo when map_size(NewBrInfo) /= 0 ->
+            BridgeOps = ovsdb_ops:update(<<"Bridge">>,
+                [{<<"_uuid">>, <<"==">>, Br_Uuid}], NewBrInfo),
+            Request = [BridgeOps] ++ [
+                ovsdb_ops:mutate(<<"Open_vSwitch">>,
+                    [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
+                    [{<<"next_cfg">>, <<"+=">>, 1}]),
+                ovsdb_ops:commit(true)
+            ],
+            transaction(Request);
+        _ ->
+            ok
+    end;
 
 bridge_cmd(_Op, _PortInfo, _Opts) ->
     ?INFO("Unhandled ~p", [{_Op, _PortInfo, _Opts}]),
     ok.
 
-port_cmd(Op, #{<<"ports">> := [<<"uuid">>, _] = Ports} = BrInfo, PortInfo, Opts) ->
-    port_cmd(Op, BrInfo#{<<"ports">> := [<<"set">>, [Ports]]}, PortInfo, Opts);
-
 port_cmd(add_port,
-        #{<<"_uuid">> := Br_Uuid, <<"ports">> := [<<"set">>, Ports]},
-        PortInfo,
-        #{port_name := PortName} = Opts) when map_size(PortInfo) == 0 ->
-
-    Interface = #{name => PortName},
-    Port = #{name => PortName, interfaces => [<<"named-uuid">>, <<"interface_uuid">>]},
-    {ok,_} = ovsdb_client:transaction([
-        ovsdb_ops:insert(<<"Interface">>, Interface, <<"interface_uuid">>),
-        ovsdb_ops:insert(<<"Port">>, Port, <<"port_uuid">>),
-        ovsdb_ops:update(<<"Bridge">>,
-            [{<<"_uuid">>, <<"==">>, Br_Uuid}],
-            #{ports => [set, [[<<"named-uuid">>, <<"port_uuid">>] | Ports]]}),
-        ovsdb_ops:mutate(<<"Open_vSwitch">>,
-            [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
-            [{<<"next_cfg">>, <<"+=">>, 1}]),
-        ovsdb_ops:commit(true)
-    ], Opts),
-    ok;
-
-port_cmd(Op,
-        #{<<"_uuid">> := Br_Uuid, <<"ports">> := [<<"set">>, Ports]},
-        #{<<"_uuid">> := Port_Uuid},
-        #{port_name := PortName} = Opts) when Op == del_port; Op == del_bond ->
-
-    {ok,_} = ovsdb_client:transaction([
-        ovsdb_ops:delete(<<"Port">>, [{name, '==', PortName}]),
-        ovsdb_ops:update(<<"Bridge">>,
-            [{<<"_uuid">>, <<"==">> ,Br_Uuid}],
-            #{ports => [set, Ports -- [Port_Uuid]]}),
-        ovsdb_ops:mutate(<<"Open_vSwitch">>,
-            [{<<"_uuid">>, <<"==">> ,get_Open_vSwitch_Uuid(Opts)}],
-            [{<<"next_cfg">>, <<"+=">>, 1}]),
-        ovsdb_ops:commit(true)
-    ], Opts),
-    ok;
-
-port_cmd(_Op, _BrInfo, _PortInfo, _Opts) ->
-    ?INFO("Unhandled ~p", [{_Op, _BrInfo, _PortInfo, _Opts}]),
-    ok.
-
-bond_cmd(add_bond,
         #{<<"_uuid">> := Br_Uuid} = BrInfo,
         PortInfo, IfaceInfo,
-        #{port_name := BondName, iface_list:= IfaceList} = Opts) ->
+        #{port_name := PortName, iface_list := IfaceList} = Opts) when map_size(PortInfo) == 0 ->
 
     #{ops := IfaceOps, uuids := IfaceUuids} = lists:foldl(fun
         (Iface, #{ops := OpsAcc, uuids := UuidsAcc} = Acc) ->
@@ -279,13 +287,13 @@ bond_cmd(add_bond,
     PortOps = case IfaceOps /= [] of
         true when map_size(PortInfo) == 0 ->
             PortInsert = ovsdb_ops:insert(<<"Port">>,
-                #{name => BondName,
+                #{name => PortName,
                     interfaces => [set, IfaceUuids]
-                }, ovsdb_utils:uuid(port, BondName)),
+                }, ovsdb_utils:uuid(port, PortName)),
             BridgeUpdate = ovsdb_ops:update(
                 <<"Bridge">>,
                 [{<<"_uuid">>, <<"==">>, Br_Uuid}],
-                #{ports => [set, [[<<"named-uuid">>, ovsdb_utils:uuid(port, BondName)] | get_set(BrInfo, <<"ports">>)]]}
+                #{ports => [set, [[<<"named-uuid">>, ovsdb_utils:uuid(port, PortName)] | get_set(BrInfo, <<"ports">>)]]}
             ),
             [PortInsert, BridgeUpdate];
         true ->
@@ -301,7 +309,8 @@ bond_cmd(add_bond,
         true ->
             ok;
         _ ->
-            Request = IfaceOps ++ PortOps ++ [
+            Request = get_wait_ops(<<"Bridge">>, BrInfo, #{<<"ports">> => ""}) ++
+                IfaceOps ++ PortOps ++ [
                 ovsdb_ops:mutate(<<"Open_vSwitch">>,
                     [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
                     [{<<"next_cfg">>, <<"+=">>, 1}]),
@@ -309,6 +318,76 @@ bond_cmd(add_bond,
             ],
             transaction(Request)
     end;
+
+port_cmd(add_port, _BrInfo,
+        #{<<"_uuid">> := Port_Uuid} = PortInfo,
+        IfaceInfo, #{iface_list := IfaceList} = Opts) ->
+
+    IfaceOps = lists:foldl(fun
+        (IfName, Acc) ->
+            case maps:get(IfName, IfaceInfo, #{}) of
+                #{<<"_uuid">> := If_Uuid} = IfaceMap ->
+                    case get_extra_config(interface, IfaceMap, Opts) of
+                        NewIfInfo when map_size(NewIfInfo) /= 0 ->
+                            [ovsdb_ops:update(<<"Interface">>,
+                                    [{<<"_uuid">>, <<"==">>, If_Uuid}], NewIfInfo)];
+                        _ ->
+                            []
+                    end;
+                _ ->
+                    IfUuid = ovsdb_utils:uuid(interface, IfName),
+                    NewIfMap = get_extra_config(interface, #{}, Opts),
+                    [
+                        ovsdb_ops:insert(<<"Interface">>, NewIfMap#{name => IfName}, IfUuid),
+                        ovsdb_ops:update(
+                            <<"Port">>,
+                            [{<<"_uuid">>, <<"==">>, maps:get(<<"_uuid">>, PortInfo)}],
+                            #{interfaces => [set, [[<<"named-uuid">>, IfUuid] | get_set(PortInfo, <<"interfaces">>)]]})
+                    ]
+            end ++ Acc
+    end, [], IfaceList),
+
+    PortOps = case get_extra_config(port, PortInfo, Opts) of
+        NewPortInfo when map_size(NewPortInfo) /= 0 ->
+            [ovsdb_ops:update(<<"Port">>,
+                [{<<"_uuid">>, <<"==">>, Port_Uuid}], NewPortInfo)];
+        _ ->
+            []
+    end,
+
+    case PortOps ++ IfaceOps of
+        [] ->
+            ok;
+        Ops ->
+            Request = Ops ++ [
+                ovsdb_ops:mutate(<<"Open_vSwitch">>,
+                    [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
+                    [{<<"next_cfg">>, <<"+=">>, 1}]),
+                ovsdb_ops:commit(true)
+            ],
+            transaction(Request)
+    end;
+
+port_cmd(Op,
+        #{<<"_uuid">> := Br_Uuid, <<"ports">> := [<<"set">>, Ports]},
+        #{<<"_uuid">> := Port_Uuid}, _,
+        #{port_name := PortName} = Opts) when Op == del_port; Op == del_bond ->
+
+    {ok,_} = ovsdb_client:transaction([
+        ovsdb_ops:delete(<<"Port">>, [{name, '==', PortName}]),
+        ovsdb_ops:update(<<"Bridge">>,
+            [{<<"_uuid">>, <<"==">> ,Br_Uuid}],
+            #{ports => [set, Ports -- [Port_Uuid]]}),
+        ovsdb_ops:mutate(<<"Open_vSwitch">>,
+            [{<<"_uuid">>, <<"==">> ,get_Open_vSwitch_Uuid(Opts)}],
+            [{<<"next_cfg">>, <<"+=">>, 1}]),
+        ovsdb_ops:commit(true)
+    ], Opts),
+    ok;
+
+port_cmd(_Op, _BrInfo, _PortInfo, _, _Opts) ->
+    ?INFO("Unhandled ~p", [{_Op, _BrInfo, _PortInfo, _Opts}]),
+    ok.
 
 bond_cmd(del_bond_iface, _, PortInfo, IfaceInfo, Opts) when is_map(PortInfo) ->
     #{ops := IfaceOps, uuids := IfaceUuids} = maps:fold(fun
@@ -348,6 +427,7 @@ bond_cmd(_Op, _BrInfo, _PortInfo, _IfaceList, _Opts) ->
     ?INFO("bond_cmd: Unhandled~n~s", [ovsdb_utils:pretty_print({_Op, _BrInfo, _PortInfo, _IfaceList, _Opts})]),
     ok.
 
+
 transaction(Request) ->
     {ok,Response} = ovsdb_client:transaction(Request),
 
@@ -385,3 +465,81 @@ get_set(Map, Key) ->
         Value ->
             [Value]
     end.
+
+get_extra_config(bridge, BrInfo, Opts) ->
+    maps:fold(fun
+        (Key, Value, Acc) when Key == datapath_id ->
+            get_extra_other_config(BrInfo, Key, Value, Acc);
+        (Key, Value, Acc) when
+            Key == datapath_type;
+            Key == fail_mode
+            ->
+            get_extra_config(BrInfo, Key, Value, Acc);
+        (Key, Value, Acc) when
+            Key == protocols
+            ->
+            get_extra_config(BrInfo, Key, Value, Acc);
+        (_,_, Acc) ->
+            Acc
+    end, #{}, Opts);
+get_extra_config(interface, BrInfo, Opts) ->
+    maps:fold(fun
+        (Key, Value, Acc) when
+            Key == admin_state;
+            Key == type
+            ->
+            get_extra_config(BrInfo, Key, Value, Acc);
+        (_,_, Acc) ->
+            Acc
+    end, #{}, Opts);
+get_extra_config(port, BrInfo, Opts) ->
+    maps:fold(fun
+        (Key, Value, Acc) when
+            Key == bond_mode;
+            Key == lacp
+            ->
+            get_extra_config(BrInfo, Key, Value, Acc);
+        (_,_, Acc) ->
+            Acc
+    end, #{}, Opts).
+
+get_extra_other_config(DbMap, Key, Value, Opts) ->
+    Column = ovsdb_utils:to_binstring(Key),
+    case maps:get(<<"other_config">>, DbMap, #{}) of
+        [<<"map">>, Pairs] when Pairs /= [] ->
+            lists:foldl(fun
+                ([K, V], OtherAcc) when Column == K ->
+                    case V == Value of
+                        true ->
+                            OtherAcc;
+                        _ ->
+                            Opts#{<<"other_config">> => [map, [[Key, Value]]]}
+                    end;
+                (_, OtherAcc) ->
+                    OtherAcc
+            end, Opts, Pairs);
+        _ ->
+            Opts#{<<"other_config">> => [map, [[Key, Value]]]}
+    end.
+
+get_extra_config(DbMap, Key, Value, Opts) ->
+    Column = ovsdb_utils:to_binstring(Key),
+    case maps:get(Column, DbMap, not_found) of
+        V when V =:= Value ->
+            Opts;
+        _ when is_list(Value)->
+            Opts#{Column => [set, Value]};
+        _ ->
+            Opts#{Column => Value}
+    end.
+
+get_wait_ops(Tabls, DbMap, NewMap) ->
+    maps:fold(fun
+        (Key, _Value, Acc) ->
+            [ovsdb_ops:wait(Tabls,
+                [{<<"_uuid">>, '==', maps:get(<<"_uuid">>, DbMap)}],
+                [#{Key => [set, get_set(DbMap, Key)]}],
+                '==',
+                [Key]
+            ) | Acc]
+    end, [], NewMap).

@@ -148,7 +148,7 @@ verify_ovs(Cmd, Match) ->
         (_, [] = Acc) ->
             case re:run(ovs_cmd(Cmd), Match) of
                 {match, _} -> ok;
-                _ -> timer:sleep(100), Acc
+                _ -> timer:sleep(150), Acc
             end;
         (_, Acc) ->
             Acc
