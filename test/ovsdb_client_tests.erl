@@ -145,6 +145,11 @@ wait_sync_call(Ref) ->
 
 verify_ovs(Cmd, Match) ->
     Ret = lists:foldl(fun
+        (_, [] = Acc) when is_tuple(Match) ->
+            case jsone:try_decode(erlang:list_to_binary(ovs_cmd(Cmd))) of
+                {ok, #{<<"data">> := Match}} -> ok;
+                _ -> timer:sleep(150), Acc
+            end;
         (_, [] = Acc) ->
             case re:run(ovs_cmd(Cmd), Match) of
                 {match, _} -> ok;
@@ -176,6 +181,8 @@ cmd(show) ->
     erlsh:oneliner(?ovs_vsctl ++ "show");
 cmd(list_br) ->
     erlsh:oneliner(?ovs_vsctl ++ "list-br");
+cmd({list, Table, Column, Row}) ->
+    erlsh:oneliner(?ovs_vsctl ++ "-f json " ++ "--column " ++ Column ++ " list " ++ Table ++ " " ++ Row);
 cmd({list_ports, BrName}) ->
     erlsh:oneliner(?ovs_vsctl ++ "list-ports " ++ BrName);
 cmd({list_ifaces, BrName}) ->

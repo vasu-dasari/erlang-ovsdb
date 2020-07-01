@@ -427,7 +427,6 @@ bond_cmd(_Op, _BrInfo, _PortInfo, _IfaceList, _Opts) ->
     ?INFO("bond_cmd: Unhandled~n~s", [ovsdb_utils:pretty_print({_Op, _BrInfo, _PortInfo, _IfaceList, _Opts})]),
     ok.
 
-
 transaction(Request) ->
     {ok,Response} = ovsdb_client:transaction(Request),
 

@@ -174,25 +174,25 @@ bridge_teardown(Opts) ->
 
 bridge_datapath_type(Opts) ->
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_type => <<"netdev">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "datapath_type       : netdev"),
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "datapath_type", "br1"}, "netdev"),
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_type => <<"system">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "datapath_type       : system").
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "datapath_type", "br1"}, "system").
 
 bridge_datapath_id(Opts) ->
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_id => <<"0000000000000001">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "other_config        : {datapath_id=\"0000000000000001\"}"),
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "other_config", "br1"}, "\"0000000000000001\""),
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_id => <<"0000000000000002">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "other_config        : {datapath_id=\"0000000000000002\"}").
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "other_config", "br1"}, "\"0000000000000002\"").
 
 bridge_fail_mode(Opts) ->
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{fail_mode => <<"secure">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "fail_mode           : secure").
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "fail_mode", "br1"}, "\"secure\"").
 
 bridge_protocols(Opts) ->
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{protocols => [<<"OpenFlow13">>]})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "                : [\"OpenFlow13\"]"),
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "protocols", "br1"}, "\"OpenFlow13\""),
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{protocols => [<<"OpenFlow13">>, <<"OpenFlow14">>]})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Bridge br1"}, "                : [\"OpenFlow13\", \"OpenFlow14\"]").
+    ovsdb_client_tests:verify_ovs({list, "Bridge", "protocols", "br1"}, "\"OpenFlow13\",\"OpenFlow14\"").
 
 bond_setup() ->
     Opts = ovsdb_client_tests:setup(),
@@ -208,24 +208,24 @@ bond_teardown(Opts) ->
 bond_lacp(Opts) ->
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{lacp => <<"active">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Port br1-bond1"}, "lacp                : active"),
+    ovsdb_client_tests:verify_ovs({list, "Port", "lacp", "br1-bond1"}, [[<<"active">>]]),
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{lacp => <<"passive">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Port br1-bond1"}, "lacp                : passive"),
+    ovsdb_client_tests:verify_ovs({list, "Port", "lacp", "br1-bond1"}, [[<<"passive">>]]),
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{lacp => <<"off">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Port br1-bond1"}, "lacp                : off").
+    ovsdb_client_tests:verify_ovs({list, "Port", "lacp", "br1-bond1"}, [[<<"off">>]]).
 
 bond_bond_mode(Opts) ->
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{bond_mode => <<"balance-tcp">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Port br1-bond1"}, "bond_mode           : balance-tcp"),
+    ovsdb_client_tests:verify_ovs({list, "Port", "bond_mode", "br1-bond1"}, [[<<"balance-tcp">>]]),
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{bond_mode => <<"balance-slb">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Port br1-bond1"}, "bond_mode           : balance-slb"),
+    ovsdb_client_tests:verify_ovs({list, "Port", "bond_mode", "br1-bond1"}, [[<<"balance-slb">>]]),
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>, [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{bond_mode => <<"active-backup">>})),
-    ovsdb_client_tests:verify_ovs({vsctl, "list Port br1-bond1"}, "bond_mode           : active-backup").
+    ovsdb_client_tests:verify_ovs({list, "Port", "bond_mode", "br1-bond1"}, [[<<"active-backup">>]]).
 
 interface_setup() ->
     Opts = ovsdb_client_tests:setup(),
@@ -254,8 +254,8 @@ interface_admin_state_bond(Opts) ->
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>,
             [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{admin_state => <<"up">>})),
-%%    ovsdb_client_tests:verify_ovs({vsctl, "list Interface bond1-eth1"}, "admin_state         : up"),
+%%    ovsdb_client_tests:verify_ovs({list, "Port", "admin_state", "br1-bond1"}, "up"),
     ?assertEqual(ok,
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>,
             [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{admin_state => <<"down">>})).
-%%    ovsdb_client_tests:verify_ovs({vsctl, "list Interface bond1-eth1"}, "admin_state         : down").
+%%    ovsdb_client_tests:verify_ovs({list, "Port", "admin_state", "br1-bond1"}, "down"),
