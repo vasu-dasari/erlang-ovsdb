@@ -31,6 +31,7 @@
     , add_port/3, del_port/3
     , add_bond/4, del_bond/3
     , add_bond_iface/4, del_bond_iface/4
+    , add_tunnel_port/4, del_tunnel_port/3
 ]).
 
 -export([vsctl/1, vsctl/2]).
@@ -41,6 +42,7 @@
 ]).
 
 -type vsctl_returns()       :: ok | error | {ok, term()} | {error, term()}.
+-type tunnel_type()         :: gre | vxlan.
 
 %% @doc Add/Modify a bridge to switch
 %%
@@ -126,6 +128,29 @@ bond(Op, BrName, BondName, IfaceList, Opts) ->
         br_name => BrName, port_name => BondName, iface_list => IfaceList
     }).
 
+%% @doc Add/Modify OVS Tunnel port
+%%
+%% This comand is equivalent to:
+%%      $ ovs-vsctl add-port br0 a1_b1 -- \
+%%              set interface a1_b1 type=vxlan options:key=1 options:remote_ip=172.31.1.1
+%% Options supported are:
+%%      key, remote_ip, local_ip, dst_mac, src_mac, vlan_id, out_port
+-spec add_tunnel_port(unicode:chardata(), unicode:chardata(), tunnel_type(), ovsdb_client:opts()) -> ovsdb_client:rpc_return().
+add_tunnel_port(BrName, Name, TunnelType, Opts) ->
+    tunnel(add_port, BrName, Name, TunnelType, Opts).
+
+%% @doc Delete a tunnel port
+%%
+%%
+-spec del_tunnel_port(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> ovsdb_client:rpc_return().
+del_tunnel_port(BrName, Name, Opts) ->
+    vsctl(del_port, Opts#{br_name => BrName, port_name => Name, iface_list => [Name]}).
+
+tunnel(Op, BrName, Name, TunnelType, Opts) ->
+    vsctl(Op, Opts#{
+        br_name => BrName, port_name => Name, type => TunnelType, iface_list => [Name]
+    }).
+
 %% @private
 vsctl(Cmd) -> vsctl(Cmd, #{}).
 
@@ -168,9 +193,6 @@ vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
     case {maps:get(<<"Bridge">>, DbInfo), maps:get(<<"Port">>, DbInfo)}  of
         {B, _} when (map_size(B) == 0) and (Op == add_port) ->
             vsctl(add_br, Opts),
-            vsctl(Op, Opts);
-        {_, P} when (map_size(P) == 0) and (Op == add_port) ->
-            do_vsctl(Op, DbInfo, Opts),
             vsctl(Op, Opts);
         {B, P} when ((map_size(B) == 0) or (map_size(P) == 0)) and ((Op == del_port) or (Op == del_bond_iface))->
             {error, invalid_configuration};
@@ -275,8 +297,13 @@ port_cmd(add_port,
         (Iface, #{ops := OpsAcc, uuids := UuidsAcc} = Acc) ->
             case maps:get(Iface, IfaceInfo, #{}) of
                 R when map_size(R) == 0 ->
+                    ExtraConfig = get_extra_config(interface, #{}, Opts),
                     Acc#{
-                        ops => [ovsdb_ops:insert(<<"Interface">>, #{name => Iface}, ovsdb_utils:uuid(interface, Iface)) | OpsAcc],
+                        ops => [
+                            ovsdb_ops:insert(<<"Interface">>,
+                                ExtraConfig#{name => Iface},
+                                ovsdb_utils:uuid(interface, Iface))
+                            | OpsAcc],
                         uuids => [[<<"named-uuid">>, ovsdb_utils:uuid(interface, Iface)] | UuidsAcc]
                     };
                 _ ->
@@ -286,8 +313,10 @@ port_cmd(add_port,
 
     PortOps = case IfaceOps /= [] of
         true when map_size(PortInfo) == 0 ->
+            ExtraConfig = get_extra_config(port, #{}, Opts),
+
             PortInsert = ovsdb_ops:insert(<<"Port">>,
-                #{name => PortName,
+                ExtraConfig#{name => PortName,
                     interfaces => [set, IfaceUuids]
                 }, ovsdb_utils:uuid(port, PortName)),
             BridgeUpdate = ovsdb_ops:update(
@@ -468,7 +497,7 @@ get_set(Map, Key) ->
 get_extra_config(bridge, BrInfo, Opts) ->
     maps:fold(fun
         (Key, Value, Acc) when Key == datapath_id ->
-            get_extra_other_config(BrInfo, Key, Value, Acc);
+            get_extra_other_config(<<"other_config">>, Key, Value, Acc);
         (Key, Value, Acc) when
             Key == datapath_type;
             Key == fail_mode
@@ -483,6 +512,17 @@ get_extra_config(bridge, BrInfo, Opts) ->
     end, #{}, Opts);
 get_extra_config(interface, BrInfo, Opts) ->
     maps:fold(fun
+        (Key, Value, Acc) when
+            Key == key;
+            Key == remote_ip;
+            Key == local_ip;
+            Key == dst_mac;
+            Key == src_mac;
+            Key == vlan_id;
+            Key == out_port
+            ->
+            %% key, remote_ip, local_ip, dst_mac, src_mac, vlan_id, out_port
+            get_extra_other_config(<<"options">>, Key, Value, Acc);
         (Key, Value, Acc) when
             Key == admin_state;
             Key == type
@@ -502,25 +542,6 @@ get_extra_config(port, BrInfo, Opts) ->
             Acc
     end, #{}, Opts).
 
-get_extra_other_config(DbMap, Key, Value, Opts) ->
-    Column = ovsdb_utils:to_binstring(Key),
-    case maps:get(<<"other_config">>, DbMap, #{}) of
-        [<<"map">>, Pairs] when Pairs /= [] ->
-            lists:foldl(fun
-                ([K, V], OtherAcc) when Column == K ->
-                    case V == Value of
-                        true ->
-                            OtherAcc;
-                        _ ->
-                            Opts#{<<"other_config">> => [map, [[Key, Value]]]}
-                    end;
-                (_, OtherAcc) ->
-                    OtherAcc
-            end, Opts, Pairs);
-        _ ->
-            Opts#{<<"other_config">> => [map, [[Key, Value]]]}
-    end.
-
 get_extra_config(DbMap, Key, Value, Opts) ->
     Column = ovsdb_utils:to_binstring(Key),
     case maps:get(Column, DbMap, not_found) of
@@ -532,6 +553,10 @@ get_extra_config(DbMap, Key, Value, Opts) ->
             Opts#{Column => Value}
     end.
 
+get_extra_other_config(OtherKey, Key, Value, Opts) ->
+    [map, OldPairs] = maps:get(OtherKey, Opts, [map, []]),
+    Opts#{OtherKey => [map, [[ovsdb_utils:to_binstring(Key), Value] | OldPairs]]}.
+
 get_wait_ops(Tabls, DbMap, NewMap) ->
     maps:fold(fun
         (Key, _Value, Acc) ->
@@ -542,3 +567,4 @@ get_wait_ops(Tabls, DbMap, NewMap) ->
                 [Key]
             ) | Acc]
     end, [], NewMap).
+

@@ -17,6 +17,16 @@ __Authors:__ Vasu Dasari.
 
 
 
+### <a name="type-tunnel_type">tunnel_type()</a> ###
+
+
+<pre><code>
+tunnel_type() = gre | vxlan
+</code></pre>
+
+
+
+
 ### <a name="type-vsctl_returns">vsctl_returns()</a> ###
 
 
@@ -29,7 +39,7 @@ vsctl_returns() = ok | error | {ok, term()} | {error, term()}
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#add_br-2">add_br/2</a></td><td>Add/Modify a bridge to switch.</td></tr><tr><td valign="top"><a href="#del_br-2">del_br/2</a></td><td>Deletes a bridge to switch.</td></tr><tr><td valign="top"><a href="#add_port-3">add_port/3</a></td><td>Add/modify port to a bridge.</td></tr><tr><td valign="top"><a href="#del_port-3">del_port/3</a></td><td>Delete port from a bridge.</td></tr><tr><td valign="top"><a href="#add_bond-4">add_bond/4</a></td><td>Create or modify bond interface.</td></tr><tr><td valign="top"><a href="#add_bond_iface-4">add_bond_iface/4</a></td><td>Add an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond_iface-4">del_bond_iface/4</a></td><td>Delete an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond-3">del_bond/3</a></td><td>Delete a bond port.</td></tr><tr><td valign="top"><a href="#trace-1">trace/1</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#add_br-2">add_br/2</a></td><td>Add/Modify a bridge to switch.</td></tr><tr><td valign="top"><a href="#del_br-2">del_br/2</a></td><td>Deletes a bridge to switch.</td></tr><tr><td valign="top"><a href="#add_port-3">add_port/3</a></td><td>Add/modify port to a bridge.</td></tr><tr><td valign="top"><a href="#del_port-3">del_port/3</a></td><td>Delete port from a bridge.</td></tr><tr><td valign="top"><a href="#add_bond-4">add_bond/4</a></td><td>Create or modify bond interface.</td></tr><tr><td valign="top"><a href="#add_bond_iface-4">add_bond_iface/4</a></td><td>Add an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond_iface-4">del_bond_iface/4</a></td><td>Delete an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond-3">del_bond/3</a></td><td>Delete a bond port.</td></tr><tr><td valign="top"><a href="#add_tunnel_port-4">add_tunnel_port/4</a></td><td>Add/Modify OVS Tunnel port.</td></tr><tr><td valign="top"><a href="#del_tunnel_port-3">del_tunnel_port/3</a></td><td>Delete a tunnel port.</td></tr><tr><td valign="top"><a href="#trace-1">trace/1</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
@@ -156,6 +166,34 @@ Delete a bond port
 
 This is equivalent to:
 $ ovs-vsctl del-bond br1 br1-bond1
+
+<a name="add_tunnel_port-4"></a>
+
+### add_tunnel_port/4 ###
+
+<pre><code>
+add_tunnel_port(BrName::<a href="unicode.md#type-chardata">unicode:chardata()</a>, Name::<a href="unicode.md#type-chardata">unicode:chardata()</a>, TunnelType::<a href="#type-tunnel_type">tunnel_type()</a>, Opts::<a href="ovsdb_client.md#type-opts">ovsdb_client:opts()</a>) -&gt; <a href="ovsdb_client.md#type-rpc_return">ovsdb_client:rpc_return()</a>
+</code></pre>
+<br />
+
+Add/Modify OVS Tunnel port
+
+This comand is equivalent to:
+$ ovs-vsctl add-port br0 a1_b1 -- \
+set interface a1_b1 type=vxlan options:key=1 options:remote_ip=172.31.1.1
+Options supported are:
+key, remote_ip, local_ip, dst_mac, src_mac, vlan_id, out_port
+
+<a name="del_tunnel_port-3"></a>
+
+### del_tunnel_port/3 ###
+
+<pre><code>
+del_tunnel_port(BrName::<a href="unicode.md#type-chardata">unicode:chardata()</a>, Name::<a href="unicode.md#type-chardata">unicode:chardata()</a>, Opts::<a href="ovsdb_client.md#type-opts">ovsdb_client:opts()</a>) -&gt; <a href="ovsdb_client.md#type-rpc_return">ovsdb_client:rpc_return()</a>
+</code></pre>
+<br />
+
+Delete a tunnel port
 
 <a name="trace-1"></a>
 

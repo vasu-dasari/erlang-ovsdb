@@ -83,6 +83,34 @@ interface_test_() ->
         } end
     }.
 
+tunnel_test_() ->
+    {setup,
+        fun tunnel_setup/0,
+        fun tunnel_teardown/1,
+        fun(S) -> {foreach, fun ovsdb_client_tests:test_setup/0,
+            [{N, fun() -> F(S) end} || {N, F} <- [
+                {"add tunnel port",                 fun tunnel_add_port/1}
+                , {"delete tunnel port",            fun tunnel_del_port/1}
+                , {"vxlan tunnel",                  fun tunnel_vxlan/1}
+                , {"fully specified vxlan tunnel",  fun tunnel_vxlan_fst/1}
+            ]]
+        } end
+    }.
+
+%%%===================================================================
+%%% Helper functions
+%%%===================================================================
+
+get_json_output(Cmd) ->
+    Output = jsone:decode(erlang:list_to_binary(ovsdb_client_tests:ovs_cmd(Cmd))),
+    ?assertMatch(#{<<"data">> := _}, Output),
+    #{<<"data">> := [[[<<"map">>, Data]]]} = Output,
+    Data.
+
+%%%===================================================================
+%%% Worker functions
+%%%===================================================================
+
 add_br(Opts) ->
     ?assertEqual(
         ok,
@@ -259,3 +287,65 @@ interface_admin_state_bond(Opts) ->
         ovsdb_vsctl:add_bond(<<"br1">>, <<"br1-bond1">>,
             [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{admin_state => <<"down">>})).
 %%    ovsdb_client_tests:verify_ovs({list, "Port", "admin_state", "br1-bond1"}, "down"),
+
+tunnel_setup() ->
+    Opts = ovsdb_client_tests:setup(),
+    ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_type => <<"netdev">>})),
+    ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br2">>, Opts#{datapath_type => <<"netdev">>})),
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_port(<<"br-underlay">>, <<"br2-eth1">>, Opts)),
+    Opts.
+
+tunnel_teardown(Opts) ->
+    ?assertEqual(ok, ovsdb_vsctl:del_br(<<"br1">>, Opts)),
+    ?assertEqual(ok, ovsdb_vsctl:del_br(<<"br2">>, Opts)),
+    ovsdb_client_tests:teardown(Opts).
+
+tunnel_add_port(Opts) ->
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, vxlan, Opts#{remote_ip => <<"1.1.1.2">>})),
+    Data = get_json_output({list, "Interface", "options", "br1-vxlan1"}),
+    ?assertEqual([
+        [<<"remote_ip">>,<<"1.1.1.2">>]
+    ], lists:sort(Data)).
+
+tunnel_vxlan(Opts) ->
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, vxlan,
+            Opts#{
+                key => <<"1000">>, remote_ip => <<"1.1.1.2">>
+            })),
+    Data = get_json_output({list, "Interface", "options", "br1-vxlan1"}),
+    ?assertEqual([
+        [<<"key">>,<<"1000">>], [<<"remote_ip">>,<<"1.1.1.2">>]
+    ], lists:sort(Data)).
+
+tunnel_vxlan_fst(Opts) ->
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_port(<<"br2">>, <<"br2-eth1">>, Opts)
+    ),
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan2">>, vxlan,
+            Opts#{
+                key => <<"2000">>, remote_ip => <<"1.1.1.2">>, local_ip => <<"1.1.1.1">>,
+                dst_mac => <<"00:00:01:01:01:02">>, src_mac => <<"00:00:01:01:01:02">>,
+                vlan_id => <<"100">>, out_port => <<"br2-eth1">>
+            })
+    ),
+    Data = get_json_output({list, "Interface", "options", "br1-vxlan2"}),
+    ?assertEqual([
+        [<<"dst_mac">>,<<"00:00:01:01:01:02">>],
+        [<<"key">>,<<"2000">>],
+        [<<"local_ip">>,<<"1.1.1.1">>],
+        [<<"out_port">>,<<"br2-eth1">>],
+        [<<"remote_ip">>,<<"1.1.1.2">>],
+        [<<"src_mac">>,<<"00:00:01:01:01:02">>],
+        [<<"vlan_id">>,<<"100">>]
+    ], lists:sort(Data)).
+
+tunnel_del_port(Opts) ->
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, vxlan, Opts#{remote_ip => <<"1.1.1.2">>})),
+    ?assertEqual(ok,
+        ovsdb_vsctl:del_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, Opts)),
+    ovsdb_client_tests:verify_ovs({list, "Interface", "options", "br1-vxlan1"}, "no row").

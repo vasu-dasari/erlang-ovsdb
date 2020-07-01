@@ -182,7 +182,7 @@ cmd(show) ->
 cmd(list_br) ->
     erlsh:oneliner(?ovs_vsctl ++ "list-br");
 cmd({list, Table, Column, Row}) ->
-    erlsh:oneliner(?ovs_vsctl ++ "-f json " ++ "--column " ++ Column ++ " list " ++ Table ++ " " ++ Row);
+    erlsh:oneliner(?ovs_vsctl ++ " -f json " ++ "--column " ++ Column ++ " list " ++ Table ++ " " ++ Row);
 cmd({list_ports, BrName}) ->
     erlsh:oneliner(?ovs_vsctl ++ "list-ports " ++ BrName);
 cmd({list_ifaces, BrName}) ->
