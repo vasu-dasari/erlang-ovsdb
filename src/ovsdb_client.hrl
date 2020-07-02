@@ -50,5 +50,6 @@
     database = <<>>         :: db_name(),
     pending_messages = #{}  :: map(),
     locks_map = #{}         :: map(),
-    msg_buffer = <<>>       :: binary()
+    msg_buffer = <<>>       :: binary(),
+    notify_conected = none  :: dst()
 }).

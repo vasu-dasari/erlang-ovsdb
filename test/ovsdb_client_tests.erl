@@ -52,9 +52,7 @@ setup() ->
     lager:set_loglevel(lager_console_backend, error),
 
     ovs_cmd(init),
-    ovsdb_utils:ovs_connect(),
-
-    verify_ovs(show, "is_connected: true"),
+    ?assertEqual(ok, ovsdb_utils:ovs_connect()),
     #{pid => ovsdb_client}.
 
 teardown(_) ->

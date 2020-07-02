@@ -354,15 +354,23 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-process_call({start, Type, IpAddr, Port, Opts}, _, State) ->
+process_call({start, Type, IpAddr, Port, Opts}, From, State) ->
     ?INFO("Starting ovsdb with ~p:~p:~p, Opts: ~p", [Type, IpAddr, Port, Opts]),
     self() ! connect,
-    {reply, ok, State#ovsdb_state{
+    NewState = State#ovsdb_state{
         proto = Type,
         ip_addr = IpAddr,
         port = Port,
         database = maps:get(database, Opts, <<>>)
-    }};
+    },
+    case maps:get(wait_until_connected, Opts, false) of
+        true ->
+            {noreply, NewState#ovsdb_state{
+                notify_conected = From
+            }};
+        _ ->
+            {reply, ok, NewState}
+    end;
 process_call(get_database, _, #ovsdb_state{database = DbName} = State) ->
     {reply, DbName, State};
 process_call(_, _, #ovsdb_state{socket = not_connected} = State) ->
@@ -390,8 +398,15 @@ process_info_msg({init}, State) ->
     {noreply, State};
 process_info_msg(connect, State) ->
     {noreply, ovsdb_comms:connect(State)};
-process_info_msg(connected, State) ->
-    {noreply, State};
+process_info_msg(connected, #ovsdb_state{notify_conected = From} = State) ->
+    case From /= none of
+        true ->
+            gen_server:reply(From, ok),
+            {noreply, State#ovsdb_state{notify_conected = none}};
+        _ ->
+            {noreply, State}
+    end;
+
 process_info_msg({Type, Socket}, #ovsdb_state{socket = Socket} = State)
     when Type == tcp_closed orelse Type == ssl_closed ->
     {noreply, ovsdb_comms:restart(Type, State)};

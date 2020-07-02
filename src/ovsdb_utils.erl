@@ -76,7 +76,10 @@ parse_server_str(Ovsdb_Server_Str) ->
     {erlang:list_to_atom(ProtocolStr), IpAddr, Port}.
 
 ovs_connect() ->
-    ok = ovsdb_client:start(get_server(), #{database => <<"Open_vSwitch">>}).
+    ok = ovsdb_client:start(get_server(), #{
+        database => <<"Open_vSwitch">>,
+        wait_until_connected => true
+    }).
 
 get_server() ->
     os:getenv("OVSDB_SERVER", "tcp:10.1.123.20:6640").
