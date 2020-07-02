@@ -148,12 +148,12 @@ verify_ovs(Cmd, Match) ->
         (_, [] = Acc) when is_tuple(Match) ->
             case jsone:try_decode(erlang:list_to_binary(ovs_cmd(Cmd))) of
                 {ok, #{<<"data">> := Match}} -> ok;
-                _ -> timer:sleep(150), Acc
+                _ -> timer:sleep(200), Acc
             end;
         (_, [] = Acc) ->
             case re:run(ovs_cmd(Cmd), Match) of
                 {match, _} -> ok;
-                _ -> timer:sleep(150), Acc
+                _ -> timer:sleep(200), Acc
             end;
         (_, Acc) ->
             Acc

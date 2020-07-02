@@ -120,7 +120,8 @@ Add/modify port to a bridge
 
 This is quivalent to
 $ ovs-vsctl add-port br1 br1-eth1
-Bridge of type netdev will be created if it does not exists
+Options supported:
+Interface options: admin_state, ofport_request
 
 <a name="del_port-3"></a>
 

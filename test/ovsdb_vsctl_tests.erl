@@ -93,6 +93,7 @@ interface_test_() ->
             [{N, fun() -> F(S) end} || {N, F} <- [
                 {"modify admin_state on port",      fun interface_admin_state_port/1}
                 , {"modify admin_state on bond",    fun interface_admin_state_bond/1}
+                , {"request a ofport number",       fun interface_ofport_request/1}
             ]]
         } end
     }.
@@ -107,6 +108,7 @@ tunnel_test_() ->
                 , {"delete tunnel port",            fun tunnel_del_port/1}
                 , {"vxlan tunnel",                  fun tunnel_vxlan/1}
                 , {"fully specified vxlan tunnel",  fun tunnel_vxlan_fst/1}
+                , {"request a ofport for tunnel",   fun tunnel_ofport_request/1}
             ]]
         } end
     }.
@@ -377,6 +379,12 @@ interface_admin_state_bond(Opts) ->
             [<<"bond1-eth1">>, <<"bond1-eth2">>], Opts#{admin_state => <<"down">>})).
 %%    ovsdb_client_tests:verify_ovs({list, "Port", "admin_state", "br1-bond1"}, "down"),
 
+interface_ofport_request(Opts) ->
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_port(<<"br1">>, <<"br1-eth1">>, Opts#{ofport_request => 200})
+    ),
+    ?assertEqual(200, get_json_output({list, "Interface", "ofport_request", "br1-eth1"})).
+
 tunnel_setup() ->
     Opts = ovsdb_client_tests:setup(),
     ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_type => <<"netdev">>})),
@@ -397,6 +405,13 @@ tunnel_add_port(Opts) ->
     ?assertEqual([
         [<<"remote_ip">>,<<"1.1.1.2">>]
     ], lists:sort(Data)).
+
+tunnel_del_port(Opts) ->
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, vxlan, Opts#{remote_ip => <<"1.1.1.2">>})),
+    ?assertEqual(ok,
+        ovsdb_vsctl:del_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, Opts)),
+    ovsdb_client_tests:verify_ovs({list, "Interface", "options", "br1-vxlan1"}, "no row").
 
 tunnel_vxlan(Opts) ->
     ?assertEqual(ok,
@@ -432,9 +447,11 @@ tunnel_vxlan_fst(Opts) ->
         [<<"vlan_id">>,<<"100">>]
     ], lists:sort(Data)).
 
-tunnel_del_port(Opts) ->
+tunnel_ofport_request(Opts) ->
     ?assertEqual(ok,
-        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, vxlan, Opts#{remote_ip => <<"1.1.1.2">>})),
-    ?assertEqual(ok,
-        ovsdb_vsctl:del_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, Opts)),
-    ovsdb_client_tests:verify_ovs({list, "Interface", "options", "br1-vxlan1"}, "no row").
+        ovsdb_vsctl:add_tunnel_port(<<"br1">>, <<"br1-vxlan1">>, vxlan,
+            Opts#{
+                ofport_request => 200,
+                key => <<"1000">>, remote_ip => <<"1.1.1.2">>
+            })),
+    ?assertEqual(200, get_json_output({list, "Interface", "ofport_request", "br1-vxlan1"})).

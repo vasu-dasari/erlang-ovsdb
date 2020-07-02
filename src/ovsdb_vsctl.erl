@@ -86,7 +86,8 @@ del_br(BrName, Opts) ->
 %%
 %% This is quivalent to
 %%    $ ovs-vsctl add-port br1 br1-eth1
-%% Bridge of type netdev will be created if it does not exists
+%% Options supported:
+%%      Interface options: admin_state, ofport_request
 -spec add_port(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
 add_port(BrName, PortName, Opts) ->
     vsctl(add_port, Opts#{br_name => BrName, port_name => PortName, iface_list => [PortName]}).
@@ -609,6 +610,7 @@ get_extra_config(interface, BrInfo, Opts) ->
             get_extra_other_config(<<"options">>, Key, Value, Acc);
         (Key, Value, Acc) when
             Key == admin_state;
+            Key == ofport_request;
             Key == type
             ->
             get_extra_config(BrInfo, Key, Value, Acc);
