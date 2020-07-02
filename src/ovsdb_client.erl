@@ -108,11 +108,8 @@ start(Type, IpAddr, Port, Opts) ->
 %%
 %% Establishes TCP connection with OVSDB server identified by "IpAddr:Port" string format.
 start(Ovsdb_Server_Str, Opts) when is_list(Ovsdb_Server_Str) ->
-    [ProtocolStr, IpStr, PortStr] = string:tokens(Ovsdb_Server_Str, ":"),
-    true = (ProtocolStr == "tcp") or (ProtocolStr == "ssl"),
-    Port = list_to_integer(PortStr),
-    {ok, IpAddr} = inet:ip(IpStr),
-    start(erlang:list_to_atom(ProtocolStr), IpAddr, Port, Opts).
+    {Protocol, IpAddr, Port} = ovsdb_utils:parse_server_str(Ovsdb_Server_Str),
+    start(Protocol, IpAddr, Port, Opts).
 
 %% @private
 get_database() ->

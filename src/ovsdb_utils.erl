@@ -24,10 +24,13 @@
 
 -include("logger.hrl").
 %% API
--export([pretty_print/1, backtrace/0, whocalledme/0, to_binstring/1, uuid/2]).
 -export([
-    unit_test_ovs/0
-    , ovs_connect/0
+    pretty_print/1, backtrace/0, whocalledme/0,
+    to_binstring/1, uuid/2,
+    parse_server_str/1
+]).
+-export([
+    ovs_connect/0
     , get_server/0]).
 
 pretty_print(Item) ->
@@ -62,61 +65,18 @@ uuid(NameSpace, String) when is_atom(NameSpace), is_binary(String) ->
     list_to_binary(string:join(
         [erlang:atom_to_list(NameSpace)] ++
         string:tokens(
-            erlang:binary_to_list(String), "-"), "_")).
+            erlang:binary_to_list(String), ":.-"), "_")).
+
+-spec parse_server_str(unicode:chardata()) -> tuple().
+parse_server_str(Ovsdb_Server_Str) ->
+    [ProtocolStr, IpStr, PortStr] = string:tokens(Ovsdb_Server_Str, ":"),
+    true = (ProtocolStr == "tcp") or (ProtocolStr == "ssl"),
+    Port = list_to_integer(PortStr),
+    {ok, IpAddr} = inet:ip(IpStr),
+    {erlang:list_to_atom(ProtocolStr), IpAddr, Port}.
 
 ovs_connect() ->
     ok = ovsdb_client:start(get_server(), #{database => <<"Open_vSwitch">>}).
 
 get_server() ->
     os:getenv("OVSDB_SERVER", "tcp:10.1.123.20:6640").
-
-%% Script to do sanity test with OVS. This will be in place till docker based tests are implemented.
-unit_test_ovs() ->
-    ok = ovsdb_client:start("tcp:10.1.123.20:6640", #{database => <<"Open_vSwitch">>}),
-    timer:sleep(1000),
-
-    {ok,_} = ovsdb_client:list_dbs(),
-    {ok,_} = ovsdb_client:get_schema(#{database => <<"_Server">>}),
-    {ok,_} = ovsdb_client:list_columns(<<"Bridge">>),
-
-    {ok,_} = ovsdb_client:transaction([ovsdb_ops:select([<<"_uuid">>, <<"bridges">>], <<"Open_vSwitch">>, [])]),
-    {ok,_} = ovsdb_client:transaction([ovsdb_ops:select([], <<"Open_vSwitch">>, [])], #{}),
-
-    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select("*", <<"Bridge">>, [])),
-    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select([<<"flood_vlans">>, <<"name">>], <<"Bridge">>, [])),
-
-    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select("*", <<"Bridge">>, [])),
-    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select([<<"flood_vlans">>, <<"name">>], <<"Bridge">>, [])),
-    {ok,_} = ovsdb_client:transaction(ovsdb_ops:select([<<"flood_vlans">>, <<"name">>], <<"Bridge">>, [{<<"name">>, <<"==">>, <<"br0">>}])),
-
-
-    {ok,_} = ovsdb_client:monitor("hello", <<"Bridge">>),
-    {ok,_} = ovsdb_client:monitor_cancel("hello"),
-
-    {ok,_} = ovsdb_client:echo(),
-
-    {ok,_} = ovsdb_client:lock("hello"),
-    {ok,_} = ovsdb_client:unlock("hello"),
-
-    {ok,_} = ovsdb_client:transaction([ovsdb_ops:select([<<"_uuid">>, <<"bridges">>], <<"Open_vSwitch">>, [])]),
-
-    {ok,_} = ovsdb_client:dump(<<"Port">>, []),
-    {ok,_} = ovsdb_client:dump(<<"Open_vSwitch">>, []),
-    {ok,_} = ovsdb_client:dump(<<"Bridge">>, []),
-
-    ok = ovsdb_vsctl:vsctl(add_br, #{br_name => <<"br1">>}),
-    ok = ovsdb_vsctl:vsctl(add_br, #{br_name => <<"br2">>}),
-
-    ok = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br1">>, port_name => <<"br1-eth1">>}),
-    ok = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br1">>, port_name => <<"br1-eth2">>}),
-    ok = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br2">>, port_name => <<"br2-eth1">>}),
-    ok = ovsdb_vsctl:vsctl(add_port, #{br_name => <<"br2">>, port_name => <<"br2-eth2">>}),
-
-    ok = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br1">>, port_name => <<"br1-eth1">>}),
-    ok = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br1">>, port_name => <<"br1-eth2">>}),
-    ok = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br2">>, port_name => <<"br2-eth1">>}),
-    ok = ovsdb_vsctl:vsctl(del_port, #{br_name => <<"br2">>, port_name => <<"br2-eth2">>}),
-
-    ok = ovsdb_vsctl:vsctl(del_br, #{br_name => <<"br1">>}),
-    ok = ovsdb_vsctl:vsctl(del_br, #{br_name => <<"br2">>}),
-    ok.

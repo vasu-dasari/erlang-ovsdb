@@ -27,7 +27,8 @@
 
 %% API
 -export([
-    add_br/2, del_br/2
+    set_controller/3, del_controller/2
+    , add_br/2, del_br/2
     , add_port/3, del_port/3
     , add_bond/4, del_bond/3
     , add_bond_iface/4, del_bond_iface/4
@@ -43,6 +44,22 @@
 
 -type vsctl_returns()       :: ok | error | {ok, term()} | {error, term()}.
 -type tunnel_type()         :: gre | vxlan.
+
+%% @doc Set Openflow Controller to Bridge
+%%
+%% This is equivalant to
+%%      $ ovs-vsctl set-controller br0 tcp:10.1.1.1:6653
+-spec set_controller(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+set_controller(BrName, Controller, Opts) ->
+    vsctl(add_controller, Opts#{controller => Controller, br_name => BrName}).
+
+%% @doc Delete Openflow Controller from Bridge
+%%
+%% This is equivalant to
+%%      $ ovs-vsctl del-controller br0
+-spec del_controller(unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+del_controller(BrName, Opts) ->
+    vsctl(del_controller, Opts#{br_name => BrName}).
 
 %% @doc Add/Modify a bridge to switch
 %%
@@ -154,8 +171,34 @@ tunnel(Op, BrName, Name, TunnelType, Opts) ->
 %% @private
 vsctl(Cmd) -> vsctl(Cmd, #{}).
 
+vsctl(Op, Opts) ->
+    try do_vsctl(Op, Opts) of
+        Return ->
+            Return
+    catch
+        Error:Reason:StackTrace ->
+            ?ERROR("Failed:~n    Op ~p, Opts ~p~n    Error ~p, Reason ~p~n    StackTrace ~n~s",
+                [Op, Opts, Error, Reason, ovsdb_utils:pretty_print(StackTrace)]),
+            {error, Error}
+    end.
+
 %% @private
-vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
+do_vsctl(Op, #{br_name := BrName} = Opts) when Op == add_controller ->
+    {ok,[#{<<"rows">> := [#{} = BrMap]}]} =
+        ovsdb_client:transaction(
+            ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]), Opts),
+    do_vsctl(Op, #{<<"Bridge">> => BrMap, <<"Controller">> => #{}}, Opts);
+
+do_vsctl(Op, #{br_name := BrName} = Opts) when Op == del_controller ->
+    {ok,[#{<<"rows">> := [#{<<"controller">> := CtrlrUuId} = BrMap]}]} =
+        ovsdb_client:transaction(
+            ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]), Opts),
+    {ok,[#{<<"rows">> := [CtrlrMap]}]} =
+        ovsdb_client:transaction(
+            ovsdb_ops:select("*", <<"Controller">>, [{<<"_uuid">>, <<"==">>, CtrlrUuId}]), Opts),
+    do_vsctl(Op, #{<<"Bridge">> => BrMap, <<"Controller">> => CtrlrMap}, Opts);
+
+do_vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
     BrInfo = case ovsdb_client:transaction(
         ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]), Opts) of
         {ok,[#{<<"rows">> := [B]}]} when is_map(B) ->
@@ -164,7 +207,7 @@ vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
             #{}
     end,
     do_vsctl(Op, BrInfo, Opts);
-vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
+do_vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
     when Op == add_port; Op == del_port; Op == del_bond_iface  ->
 
     Request = [
@@ -192,15 +235,15 @@ vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
 
     case {maps:get(<<"Bridge">>, DbInfo), maps:get(<<"Port">>, DbInfo)}  of
         {B, _} when (map_size(B) == 0) and (Op == add_port) ->
-            vsctl(add_br, Opts),
-            vsctl(Op, Opts);
+            do_vsctl(add_br, Opts),
+            do_vsctl(Op, Opts);
         {B, P} when ((map_size(B) == 0) or (map_size(P) == 0)) and ((Op == del_port) or (Op == del_bond_iface))->
             {error, invalid_configuration};
         _ ->
             do_vsctl(Op, DbInfo, Opts)
     end;
 
-vsctl(Cmd, _) ->
+do_vsctl(Cmd, _) ->
     ?INFO("~p: Not supported", [Cmd]),
     not_yet.
 
@@ -209,6 +252,9 @@ process_vsctl(Cmd, Opts, State) ->
     ?INFO("~p: Opts ~p", [Cmd, Opts]),
     State.
 
+do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Controller">> := CtrlrInfo},
+        Opts) when Op == add_controller; Op == del_controller ->
+    controller_cmd(Op, BrInfo, CtrlrInfo, Opts);
 do_vsctl(Op, BrInfo, Opts) when Op == add_br; Op == del_br ->
     bridge_cmd(Op, BrInfo, Opts);
 do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo, <<"Interface">> := IfaceList},
@@ -219,6 +265,44 @@ do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo, <<"Interface">> :
     bond_cmd(Op, BrInfo, PortInfo, IfaceList, Opts);
 do_vsctl(_Op, _BrInfo, _Opts) ->
     ok.
+
+controller_cmd(add_controller,
+        #{<<"controller">> := BrCtrlrUuid},
+        #{<<"_uuid">> := CtrlUuid}, _) when BrCtrlrUuid == CtrlUuid ->
+    ok;
+controller_cmd(del_controller,
+        #{<<"controller">> := BrCtrlrUuid} = BrInfo,
+        #{<<"_uuid">> := CtrlUuid, <<"target">> := Target}, Opts) when BrCtrlrUuid == CtrlUuid ->
+    Request = [
+        ovsdb_ops:delete(<<"Controller">>, [{target, '==', Target}]),
+        ovsdb_ops:update(<<"Bridge">>,
+            [{<<"_uuid">>, <<"==">>, maps:get(<<"_uuid">>, BrInfo)}],
+            #{controller => [set, []]}),
+        ovsdb_ops:mutate(<<"Open_vSwitch">>,
+            [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
+            [{<<"next_cfg">>, <<"+=">>, 1}]),
+        ovsdb_ops:commit(true)
+    ],
+    transaction(Request, Opts);
+controller_cmd(add_controller,
+        #{<<"controller">> := BrCtrlrUuid} = BrInfo, CtrlrInfo,
+        #{controller := Target} = Opts) when map_size(CtrlrInfo) == 0 ->
+    Request =
+        get_wait_ops(<<"Bridge">>, BrInfo, #{<<"controller">> => BrCtrlrUuid}) ++ [
+        ovsdb_ops:insert(<<"Controller">>,
+            #{target => Target}, ovsdb_utils:uuid(controller, Target)),
+        ovsdb_ops:update(
+            <<"Bridge">>,
+            [{<<"_uuid">>, <<"==">>, maps:get(<<"_uuid">>, BrInfo)}],
+            #{controller => [<<"named-uuid">>,  ovsdb_utils:uuid(controller, Target)]}),
+        ovsdb_ops:mutate(<<"Open_vSwitch">>,
+            [{<<"_uuid">>, <<"==">>, get_Open_vSwitch_Uuid(Opts)}],
+            [{<<"next_cfg">>, <<"+=">>, 1}]),
+        ovsdb_ops:commit(true)
+    ],
+    transaction(Request, Opts);
+controller_cmd(_Op, _BrInfo, _CtrlrInfo, _Opts) ->
+    {error, invalid_configuration}.
 
 bridge_cmd(del_br, #{<<"_uuid">> := Br_Uuid}, #{br_name := BrName} = Opts) ->
     {ok, [#{<<"_uuid">> := Open_vSwitch_Uuid} = OvSInfo]} =
@@ -266,7 +350,7 @@ bridge_cmd(add_br, BrInfo, #{br_name := BrName} = Opts) when map_size(BrInfo) ==
             [{<<"next_cfg">>, <<"+=">>, 1}]),
         ovsdb_ops:commit(true)
     ],
-    transaction(Request);
+    transaction(Request, Opts);
 
 bridge_cmd(add_br, #{<<"_uuid">> := Br_Uuid} = BrInfo, Opts) ->
     case get_extra_config(bridge, BrInfo, Opts) of
@@ -279,7 +363,7 @@ bridge_cmd(add_br, #{<<"_uuid">> := Br_Uuid} = BrInfo, Opts) ->
                     [{<<"next_cfg">>, <<"+=">>, 1}]),
                 ovsdb_ops:commit(true)
             ],
-            transaction(Request);
+            transaction(Request, Opts);
         _ ->
             ok
     end;
@@ -345,7 +429,7 @@ port_cmd(add_port,
                     [{<<"next_cfg">>, <<"+=">>, 1}]),
                 ovsdb_ops:commit(true)
             ],
-            transaction(Request)
+            transaction(Request, Opts)
     end;
 
 port_cmd(add_port, _BrInfo,
@@ -394,7 +478,7 @@ port_cmd(add_port, _BrInfo,
                     [{<<"next_cfg">>, <<"+=">>, 1}]),
                 ovsdb_ops:commit(true)
             ],
-            transaction(Request)
+            transaction(Request, Opts)
     end;
 
 port_cmd(Op,
@@ -449,18 +533,18 @@ bond_cmd(del_bond_iface, _, PortInfo, IfaceInfo, Opts) when is_map(PortInfo) ->
                     [{<<"next_cfg">>, <<"+=">>, 1}]),
                 ovsdb_ops:commit(true)
             ],
-            transaction(Request)
+            transaction(Request, Opts)
     end;
 
 bond_cmd(_Op, _BrInfo, _PortInfo, _IfaceList, _Opts) ->
     ?INFO("bond_cmd: Unhandled~n~s", [ovsdb_utils:pretty_print({_Op, _BrInfo, _PortInfo, _IfaceList, _Opts})]),
     ok.
 
-transaction(Request) ->
-    {ok,Response} = ovsdb_client:transaction(Request),
+transaction(Request, Opts) ->
+    {ok,Response} = ovsdb_client:transaction(Request, Opts),
 
-    ?DEBUG("Request~n~s", [ovsdb_utils:pretty_print(Request)]),
-    ?DEBUG("Response~n~s", [ovsdb_utils:pretty_print(Response)]),
+    ?INFO("Request~n~s", [ovsdb_utils:pretty_print(Request)]),
+    ?INFO("Response~n~s", [ovsdb_utils:pretty_print(Response)]),
     lists:foldl(fun
         ({Req, #{<<"error">> := _} = Rsp}, _) ->
             ?WARNING("Errors:~n~s", [ovsdb_utils:pretty_print({Req, Rsp})]),

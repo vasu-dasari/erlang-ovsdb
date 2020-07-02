@@ -24,7 +24,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--export([del_bond_iface/1, del_bond/1]).
+-export([del_bond_iface/1, del_bond/1, get_json_output/1]).
 
 vsctl_test_() ->
     {setup,
@@ -40,6 +40,20 @@ vsctl_test_() ->
                 ,{"add_bond_iface",             fun add_bond_iface/1}
                 ,{"del_bond_iface",             fun del_bond_iface/1}
                 ,{"del_bond",                   fun del_bond/1}
+            ]]
+        } end
+    }.
+
+controller_test_() ->
+    {setup,
+        fun controller_setup/0,
+        fun controller_teardown/1,
+        fun(S) -> {foreach, fun ovsdb_client_tests:test_setup/0,
+            [{N, fun() -> F(S) end} || {N, F} <- [
+                {"add controller",              fun controller_set/1}
+                , {"delete controller",         fun controller_delete/1}
+                , {"replace controller",        fun controller_replace/1}
+                , {"share controller",          fun controller_share/1}
             ]]
         } end
     }.
@@ -104,8 +118,12 @@ tunnel_test_() ->
 get_json_output(Cmd) ->
     Output = jsone:decode(erlang:list_to_binary(ovsdb_client_tests:ovs_cmd(Cmd))),
     ?assertMatch(#{<<"data">> := _}, Output),
-    #{<<"data">> := [[[<<"map">>, Data]]]} = Output,
-    Data.
+    case Output of
+        #{<<"data">> := [[[<<"map">>, Data]]]} -> Data;
+        #{<<"data">> := [[Data]]} -> Data;
+        #{<<"data">> := Data} -> Data;
+        #{<<"data">> := []} -> []
+    end.
 
 %%%===================================================================
 %%% Worker functions
@@ -190,6 +208,77 @@ del_bond(Opts) ->
         ovsdb_vsctl:del_bond(<<"br1">>, <<"br1-bond1">>, Opts)),
     ovsdb_client_tests:verify_ovs({list_ports, "br1"}, ""),
     ovsdb_client_tests:ovs_cmd({vsctl, "del-br br1"}).
+
+controller_setup() ->
+    Opts = ovsdb_client_tests:setup(),
+    ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br1">>, Opts#{datapath_type => <<"netdev">>})),
+    ?assertEqual(ok, ovsdb_vsctl:add_br(<<"br2">>, Opts#{datapath_type => <<"netdev">>})),
+    ?assertEqual(ok,
+        ovsdb_vsctl:add_port(<<"br-underlay">>, <<"br2-eth1">>, Opts)),
+    Opts.
+
+controller_teardown(Opts) ->
+    ?assertEqual(ok, ovsdb_vsctl:del_br(<<"br1">>, Opts)),
+    ?assertEqual(ok, ovsdb_vsctl:del_br(<<"br2">>, Opts)),
+    ovsdb_client_tests:teardown(Opts).
+
+controller_set(Opts) ->
+    CtrlrIp = <<"tcp:10.1.1.1:6653">>,
+    ?assertEqual(ok,
+        ovsdb_vsctl:set_controller(<<"br1">>, CtrlrIp, Opts)
+    ),
+    BrData = get_json_output({list, "Bridge", "controller", "br1"}),
+    ?assertMatch(
+        [<<"uuid">>,_], BrData
+    ),
+    [<<"uuid">>, Uuid] = BrData,
+    ?assertEqual(
+        CtrlrIp,
+        get_json_output({list, "Controller", "target", erlang:binary_to_list(Uuid)})
+    ).
+
+controller_delete(Opts) ->
+    CtrlrIp = <<"tcp:10.1.1.1:6653">>,
+    ?assertEqual(ok, ovsdb_vsctl:set_controller(<<"br1">>, CtrlrIp, Opts)),
+    ?assertEqual(ok,
+        ovsdb_vsctl:del_controller(<<"br1">>, Opts)
+    ),
+    ?assertMatch([<<"set">>,[]], get_json_output({list, "Bridge", "controller", "br1"})),
+    ?assertEqual([], get_json_output({list, "Controller", "target", ""})).
+
+controller_replace(Opts) ->
+    CtrlrIp1 = <<"tcp:10.1.1.1:6653">>,
+    CtrlrIp2 = <<"tcp:10.1.1.2:6653">>,
+    ?assertEqual(ok, ovsdb_vsctl:set_controller(<<"br1">>, CtrlrIp1, Opts)),
+
+    ?assertEqual(ok, ovsdb_vsctl:set_controller(<<"br1">>, CtrlrIp2, Opts)),
+    BrData = get_json_output({list, "Bridge", "controller", "br1"}),
+    ?assertMatch(
+        [<<"uuid">>,_], BrData
+    ),
+    ?assertEqual(
+        CtrlrIp2,
+        get_json_output({list, "Controller", "target", ""})
+    ).
+
+controller_share(Opts) ->
+    CtrlrIp = <<"tcp:10.1.1.1:6653">>,
+    ?assertEqual(ok, ovsdb_vsctl:set_controller(<<"br1">>, CtrlrIp, Opts)),
+    ?assertEqual(ok, ovsdb_vsctl:set_controller(<<"br2">>, CtrlrIp, Opts)),
+
+    BrData1 = get_json_output({list, "Bridge", "controller", "br1"}),
+    ?assertMatch(
+        [<<"uuid">>,_], BrData1
+    ),
+    BrData2 = get_json_output({list, "Bridge", "controller", "br2"}),
+    ?assertMatch(
+        [<<"uuid">>,_], BrData2
+    ),
+    ?assertNotEqual(BrData1, BrData2),
+    ?assertEqual(
+        [[<<"tcp:10.1.1.1:6653">>],[<<"tcp:10.1.1.1:6653">>]],
+        get_json_output({list, "Controller", "target", ""})
+    ).
 
 bridge_setup() ->
     Opts = ovsdb_client_tests:setup(),

@@ -39,12 +39,40 @@ vsctl_returns() = ok | error | {ok, term()} | {error, term()}
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#add_br-2">add_br/2</a></td><td>Add/Modify a bridge to switch.</td></tr><tr><td valign="top"><a href="#del_br-2">del_br/2</a></td><td>Deletes a bridge to switch.</td></tr><tr><td valign="top"><a href="#add_port-3">add_port/3</a></td><td>Add/modify port to a bridge.</td></tr><tr><td valign="top"><a href="#del_port-3">del_port/3</a></td><td>Delete port from a bridge.</td></tr><tr><td valign="top"><a href="#add_bond-4">add_bond/4</a></td><td>Create or modify bond interface.</td></tr><tr><td valign="top"><a href="#add_bond_iface-4">add_bond_iface/4</a></td><td>Add an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond_iface-4">del_bond_iface/4</a></td><td>Delete an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond-3">del_bond/3</a></td><td>Delete a bond port.</td></tr><tr><td valign="top"><a href="#add_tunnel_port-4">add_tunnel_port/4</a></td><td>Add/Modify OVS Tunnel port.</td></tr><tr><td valign="top"><a href="#del_tunnel_port-3">del_tunnel_port/3</a></td><td>Delete a tunnel port.</td></tr><tr><td valign="top"><a href="#trace-1">trace/1</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#set_controller-3">set_controller/3</a></td><td>Set Openflow Controller to Bridge.</td></tr><tr><td valign="top"><a href="#del_controller-2">del_controller/2</a></td><td>Delete Openflow Controller from Bridge.</td></tr><tr><td valign="top"><a href="#add_br-2">add_br/2</a></td><td>Add/Modify a bridge to switch.</td></tr><tr><td valign="top"><a href="#del_br-2">del_br/2</a></td><td>Deletes a bridge to switch.</td></tr><tr><td valign="top"><a href="#add_port-3">add_port/3</a></td><td>Add/modify port to a bridge.</td></tr><tr><td valign="top"><a href="#del_port-3">del_port/3</a></td><td>Delete port from a bridge.</td></tr><tr><td valign="top"><a href="#add_bond-4">add_bond/4</a></td><td>Create or modify bond interface.</td></tr><tr><td valign="top"><a href="#add_bond_iface-4">add_bond_iface/4</a></td><td>Add an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond_iface-4">del_bond_iface/4</a></td><td>Delete an interface to a bond.</td></tr><tr><td valign="top"><a href="#del_bond-3">del_bond/3</a></td><td>Delete a bond port.</td></tr><tr><td valign="top"><a href="#add_tunnel_port-4">add_tunnel_port/4</a></td><td>Add/Modify OVS Tunnel port.</td></tr><tr><td valign="top"><a href="#del_tunnel_port-3">del_tunnel_port/3</a></td><td>Delete a tunnel port.</td></tr><tr><td valign="top"><a href="#vsctl-2">vsctl/2</a></td><td></td></tr><tr><td valign="top"><a href="#trace-1">trace/1</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
 
 ## Function Details ##
+
+<a name="set_controller-3"></a>
+
+### set_controller/3 ###
+
+<pre><code>
+set_controller(BrName::<a href="unicode.md#type-chardata">unicode:chardata()</a>, Controller::<a href="unicode.md#type-chardata">unicode:chardata()</a>, Opts::<a href="ovsdb_client.md#type-opts">ovsdb_client:opts()</a>) -&gt; <a href="#type-vsctl_returns">vsctl_returns()</a>
+</code></pre>
+<br />
+
+Set Openflow Controller to Bridge
+
+This is equivalant to
+$ ovs-vsctl set-controller br0 tcp:10.1.1.1:6653
+
+<a name="del_controller-2"></a>
+
+### del_controller/2 ###
+
+<pre><code>
+del_controller(BrName::<a href="unicode.md#type-chardata">unicode:chardata()</a>, Opts::<a href="ovsdb_client.md#type-opts">ovsdb_client:opts()</a>) -&gt; <a href="#type-vsctl_returns">vsctl_returns()</a>
+</code></pre>
+<br />
+
+Delete Openflow Controller from Bridge
+
+This is equivalant to
+$ ovs-vsctl del-controller br0
 
 <a name="add_br-2"></a>
 
@@ -194,6 +222,12 @@ del_tunnel_port(BrName::<a href="unicode.md#type-chardata">unicode:chardata()</a
 <br />
 
 Delete a tunnel port
+
+<a name="vsctl-2"></a>
+
+### vsctl/2 ###
+
+`vsctl(Op, Opts) -> any()`
 
 <a name="trace-1"></a>
 
