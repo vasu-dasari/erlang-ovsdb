@@ -53,7 +53,7 @@ get_schema(Opts) ->
     gen_server:call(get_proc(Opts), {send, rpc2map(get_schema, 0, [get_database(Opts)])}).
 
 transaction(Operation, Opts) when not is_list(Operation) ->
-    transaction(Opts, [Operation]);
+    transaction([Operation], Opts);
 transaction(Operations, Opts) when is_list(Operations) ->
     gen_server:call(get_proc(Opts), {send, rpc2map(transact, 0, [get_database(Opts)] ++ Operations)}).
 
@@ -122,7 +122,9 @@ process_message(
         #{<<"method">> := <<"update">>, <<"params">> := [PidInfo, Update]},
         State) ->
     [Id, PidList] = string:split(PidInfo, ","),
-    erlang:send(erlang:list_to_pid(PidList),{ovsdb_monitor, Id, Update}),
+    erlang:send(
+        erlang:list_to_pid(erlang:binary_to_list(PidList)),
+        {ovsdb_monitor, Id, Update}),
     State;
 process_message(
         #{<<"method">> := Method, <<"params">> := [LockId]},

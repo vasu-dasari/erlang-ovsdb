@@ -544,8 +544,8 @@ bond_cmd(_Op, _BrInfo, _PortInfo, _IfaceList, _Opts) ->
 transaction(Request, Opts) ->
     {ok,Response} = ovsdb_client:transaction(Request, Opts),
 
-    ?INFO("Request~n~s", [ovsdb_utils:pretty_print(Request)]),
-    ?INFO("Response~n~s", [ovsdb_utils:pretty_print(Response)]),
+    ?DEBUG("Request~n~s", [ovsdb_utils:pretty_print(Request)]),
+    ?DEBUG("Response~n~s", [ovsdb_utils:pretty_print(Response)]),
     lists:foldl(fun
         ({Req, #{<<"error">> := _} = Rsp}, _) ->
             ?WARNING("Errors:~n~s", [ovsdb_utils:pretty_print({Req, Rsp})]),

@@ -25,7 +25,7 @@
 -include("ovsdb_client.hrl").
 
 %% API
--export([connect/1, restart/2, recv_data/2, send_data/3]).
+-export([connect/1, close/1, restart/2, recv_data/2, send_data/3]).
 
 recv_data(<<>>, #ovsdb_state{socket = Socket} = State) ->
     ok = setopts(tcp, Socket, [{active, once}]),
@@ -76,6 +76,10 @@ connect(#ovsdb_state{
     end;
 connect(State) ->
     State.
+
+close(#ovsdb_state{proto = Protocol, socket = Socket} = State) ->
+    close(Protocol, Socket),
+    State#ovsdb_state{socket = not_connected}.
 
 restart(Reason,
         #ovsdb_state{

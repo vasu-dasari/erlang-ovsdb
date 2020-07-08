@@ -116,7 +116,7 @@ rpc_return() = {ok, term()} | {error, term()} | not_connected
 ## Function Index ##
 
 
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#start-4">start/4</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#list_dbs-1">list_dbs/1</a></td><td>Lists available databases.</td></tr><tr><td valign="top"><a href="#list_dbs-0">list_dbs/0</a></td><td>Equivalent to <a href="#list_dbs-1"><tt>list_dbs(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema-1">get_schema/1</a></td><td>Get database schema.</td></tr><tr><td valign="top"><a href="#get_schema-0">get_schema/0</a></td><td>Equivalent to <a href="#get_schema-1"><tt>get_schema(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#transaction-2">transaction/2</a></td><td>Perform OVSDB Transaction.</td></tr><tr><td valign="top"><a href="#transaction-1">transaction/1</a></td><td>Equivalent to <a href="#transaction-2"><tt>transaction(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#cancel-2">cancel/2</a></td><td>Cancel Transaction.</td></tr><tr><td valign="top"><a href="#cancel-1">cancel/1</a></td><td>Equivalent to <a href="#cancel-2"><tt>cancel(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor-3">monitor/3</a></td><td>Monitor.</td></tr><tr><td valign="top"><a href="#monitor-2">monitor/2</a></td><td>Equivalent to <a href="#monitor-3"><tt>monitor(Id, Select, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor_cancel-2">monitor_cancel/2</a></td><td>Cancel Monitor Operation.</td></tr><tr><td valign="top"><a href="#monitor_cancel-1">monitor_cancel/1</a></td><td>Equivalent to <a href="#monitor_cancel-2"><tt>monitor_cancel(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#lock-2">lock/2</a></td><td>Lock Database.</td></tr><tr><td valign="top"><a href="#lock-1">lock/1</a></td><td>Equivalent to <a href="#lock-2"><tt>lock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#steal-2">steal/2</a></td><td>Steal lock.</td></tr><tr><td valign="top"><a href="#steal-1">steal/1</a></td><td>Equivalent to <a href="#steal-2"><tt>steal(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#unlock-2">unlock/2</a></td><td>Unlock database.</td></tr><tr><td valign="top"><a href="#unlock-1">unlock/1</a></td><td>Equivalent to <a href="#unlock-2"><tt>unlock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#echo-1">echo/1</a></td><td>Echo.</td></tr><tr><td valign="top"><a href="#echo-0">echo/0</a></td><td>Equivalent to <a href="#echo-0"><tt>echo()</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema_version-1">get_schema_version/1</a></td><td>Get OVSDB Schema's version.</td></tr><tr><td valign="top"><a href="#get_schema_version-0">get_schema_version/0</a></td><td>Equivalent to <a href="#get_schema_version-1"><tt>get_schema_version(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_columns-2">list_columns/2</a></td><td>Get columns of table.</td></tr><tr><td valign="top"><a href="#list_columns-1">list_columns/1</a></td><td>Equivalent to <a href="#list_columns-2"><tt>list_columns(Table, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_tables-1">list_tables/1</a></td><td>Get a list of tables.</td></tr><tr><td valign="top"><a href="#list_tables-0">list_tables/0</a></td><td>Equivalent to <a href="#list_tables-1"><tt>list_tables(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#dump-2">dump/2</a></td><td></td></tr><tr><td valign="top"><a href="#dump-3">dump/3</a></td><td></td></tr></table>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#start-4">start/4</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#start-2">start/2</a></td><td>Starts TCP connection.</td></tr><tr><td valign="top"><a href="#stop-1">stop/1</a></td><td>Stop ovsdb connection if established.</td></tr><tr><td valign="top"><a href="#info-1">info/1</a></td><td>Get information about the ovsdb process.</td></tr><tr><td valign="top"><a href="#list_dbs-1">list_dbs/1</a></td><td>Lists available databases.</td></tr><tr><td valign="top"><a href="#list_dbs-0">list_dbs/0</a></td><td>Equivalent to <a href="#list_dbs-1"><tt>list_dbs(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema-1">get_schema/1</a></td><td>Get database schema.</td></tr><tr><td valign="top"><a href="#get_schema-0">get_schema/0</a></td><td>Equivalent to <a href="#get_schema-1"><tt>get_schema(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#transaction-2">transaction/2</a></td><td>Perform OVSDB Transaction.</td></tr><tr><td valign="top"><a href="#transaction-1">transaction/1</a></td><td>Equivalent to <a href="#transaction-2"><tt>transaction(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#cancel-2">cancel/2</a></td><td>Cancel Transaction.</td></tr><tr><td valign="top"><a href="#cancel-1">cancel/1</a></td><td>Equivalent to <a href="#cancel-2"><tt>cancel(Operation, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor-3">monitor/3</a></td><td>Monitor.</td></tr><tr><td valign="top"><a href="#monitor-2">monitor/2</a></td><td>Equivalent to <a href="#monitor-3"><tt>monitor(Id, Select, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#monitor_cancel-2">monitor_cancel/2</a></td><td>Cancel Monitor Operation.</td></tr><tr><td valign="top"><a href="#monitor_cancel-1">monitor_cancel/1</a></td><td>Equivalent to <a href="#monitor_cancel-2"><tt>monitor_cancel(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#lock-2">lock/2</a></td><td>Lock Database.</td></tr><tr><td valign="top"><a href="#lock-1">lock/1</a></td><td>Equivalent to <a href="#lock-2"><tt>lock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#steal-2">steal/2</a></td><td>Steal lock.</td></tr><tr><td valign="top"><a href="#steal-1">steal/1</a></td><td>Equivalent to <a href="#steal-2"><tt>steal(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#unlock-2">unlock/2</a></td><td>Unlock database.</td></tr><tr><td valign="top"><a href="#unlock-1">unlock/1</a></td><td>Equivalent to <a href="#unlock-2"><tt>unlock(Id, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#echo-1">echo/1</a></td><td>Echo.</td></tr><tr><td valign="top"><a href="#echo-0">echo/0</a></td><td>Equivalent to <a href="#echo-0"><tt>echo()</tt></a>.</td></tr><tr><td valign="top"><a href="#get_schema_version-1">get_schema_version/1</a></td><td>Get OVSDB Schema's version.</td></tr><tr><td valign="top"><a href="#get_schema_version-0">get_schema_version/0</a></td><td>Equivalent to <a href="#get_schema_version-1"><tt>get_schema_version(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_columns-2">list_columns/2</a></td><td>Get columns of table.</td></tr><tr><td valign="top"><a href="#list_columns-1">list_columns/1</a></td><td>Equivalent to <a href="#list_columns-2"><tt>list_columns(Table, #{})</tt></a>.</td></tr><tr><td valign="top"><a href="#list_tables-1">list_tables/1</a></td><td>Get a list of tables.</td></tr><tr><td valign="top"><a href="#list_tables-0">list_tables/0</a></td><td>Equivalent to <a href="#list_tables-1"><tt>list_tables(#{})</tt></a>.</td></tr><tr><td valign="top"><a href="#dump-2">dump/2</a></td><td></td></tr><tr><td valign="top"><a href="#dump-3">dump/3</a></td><td></td></tr><tr><td valign="top"><a href="#start_link-3">start_link/3</a></td><td>start_link when instantiated from applications own supervisor.</td></tr></table>
 
 
 <a name="functions"></a>
@@ -149,6 +149,24 @@ is different.
 Starts TCP connection
 
 Establishes TCP connection with OVSDB server identified by "IpAddr:Port" string format.
+
+<a name="stop-1"></a>
+
+### stop/1 ###
+
+`stop(Opts) -> any()`
+
+Stop ovsdb connection if established
+
+<a name="info-1"></a>
+
+### info/1 ###
+
+`info(Opts) -> any()`
+
+Get information about the ovsdb process
+
+This API can be used to retrieve the callback module information among other things
 
 <a name="list_dbs-1"></a>
 
@@ -459,4 +477,18 @@ dump(Table::<a href="#type-db_table">db_table()</a>, Columns::list()) -&gt; <a h
 ### dump/3 ###
 
 `dump(Table, Columns, Opts) -> any()`
+
+<a name="start_link-3"></a>
+
+### start_link/3 ###
+
+<pre><code>
+start_link(ProcName::<a href="#type-dst">dst()</a>, CallbackModuleName::module(), CallbackState::term()) -&gt; {ok, Pid::pid()} | ignore | {error, Reason::term()}
+</code></pre>
+<br />
+
+start_link when instantiated from applications own supervisor
+
+ovsdb_client keeps a state for the application module which can provide contet to the application
+when callbacks are called
 
