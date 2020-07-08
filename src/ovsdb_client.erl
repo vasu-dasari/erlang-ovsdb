@@ -30,7 +30,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0, start_link/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -42,6 +42,11 @@
 
 -export([
     start/2, start/4,
+    stop/1,
+    info/1
+]).
+
+-export([
     get_database/0, get_database/1
 ]).
 
@@ -110,6 +115,18 @@ start(Type, IpAddr, Port, Opts) ->
 start(Ovsdb_Server_Str, Opts) when is_list(Ovsdb_Server_Str) ->
     {Protocol, IpAddr, Port} = ovsdb_utils:parse_server_str(Ovsdb_Server_Str),
     start(Protocol, IpAddr, Port, Opts).
+
+%% @doc Stop ovsdb connection if established
+%%
+%%
+stop(Opts) ->
+    gen_server:call(get_proc(Opts), {stop}).
+
+%% @doc Get information about the ovsdb process
+%%
+%% This API can be used to retrieve the callback module information among other things
+info(Opts) ->
+    gen_server:call(get_proc(Opts), {info}).
 
 %% @private
 get_database() ->
@@ -288,6 +305,15 @@ dump(Table, Columns, Opts) when is_binary(Table) ->
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+%% @doc start_link when instantiated from applications own supervisor
+%%
+%% ovsdb_client keeps a state for the application module which can provide contet to the application
+%% when callbacks are called
+-spec start_link(dst(), module(), term()) ->
+    {ok, Pid :: pid()} | ignore | {error, Reason :: term()}.
+start_link(ProcName, CallbackModuleName, CallbackState) ->
+    gen_server:start_link({local, ProcName}, ?MODULE, [ProcName, CallbackModuleName, CallbackState], []).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -295,7 +321,17 @@ start_link() ->
 %% @hidden
 init([]) ->
     self() ! {init},
-    {ok, #ovsdb_state{}}.
+    {ok, #ovsdb_state{}};
+
+init([ProcName, CallbackModule, CallbackState]) ->
+    ?INFO("~p: Starting ~s with handler module at ~p",
+        [ProcName, ?MODULE_STRING, CallbackModule]),
+    self() ! {init},
+    {ok, #ovsdb_state{
+        proc = ProcName,
+        callback_module = CallbackModule,
+        callback_state = CallbackState
+    }}.
 
 %% @hidden
 handle_call(Request, From, State) ->
@@ -371,6 +407,18 @@ process_call({start, Type, IpAddr, Port, Opts}, From, State) ->
         _ ->
             {reply, ok, NewState}
     end;
+process_call({stop}, _, State) ->
+    {reply, ok, ovsdb_comms:close(State)};
+process_call({info}, _, State) ->
+    {reply, #{
+        callback_module => State#ovsdb_state.callback_module,
+        callback_state => State#ovsdb_state.callback_state,
+        proto => State#ovsdb_state.proto,
+        ip_addr => State#ovsdb_state.ip_addr,
+        port => State#ovsdb_state.port,
+        socket => State#ovsdb_state.socket,
+        database => State#ovsdb_state.database
+    }, State};
 process_call(get_database, _, #ovsdb_state{database = DbName} = State) ->
     {reply, DbName, State};
 process_call(_, _, #ovsdb_state{socket = not_connected} = State) ->
@@ -395,16 +443,17 @@ process_cast(Request, State) ->
 
 process_info_msg({init}, State) ->
     ?init_msg_id(),
-    {noreply, State};
+    {noreply, do_callback(notify, init_done, #{}, State)};
 process_info_msg(connect, State) ->
     {noreply, ovsdb_comms:connect(State)};
 process_info_msg(connected, #ovsdb_state{notify_conected = From} = State) ->
     case From /= none of
         true ->
             gen_server:reply(From, ok),
-            {noreply, State#ovsdb_state{notify_conected = none}};
+            {noreply,
+                do_callback(notify, connected, #{}, State#ovsdb_state{notify_conected = none})};
         _ ->
-            {noreply, State}
+            {noreply, do_callback(notify, connected, #{}, State)}
     end;
 
 process_info_msg({Type, Socket}, #ovsdb_state{socket = Socket} = State)
@@ -420,3 +469,16 @@ process_info_msg({Proto, Socket, Data}, #ovsdb_state{socket = Socket, proto = Pr
 process_info_msg(Request, State) ->
     ?INFO("info: Request~n~p", [Request]),
     {noreply, State}.
+
+%%%===================================================================
+%%% Helper Functions
+%%%===================================================================
+
+do_callback(_, _, _, #ovsdb_state{callback_module = ?SERVER} = State) ->
+    State;
+do_callback(Function, Event, Msg,
+        #ovsdb_state{callback_module = Module, callback_state = CallbackState} = State) ->
+    {ok, NewCallbackState} = erlang:apply(Module, Function, [Event, Msg, CallbackState]),
+    State#ovsdb_state{
+        callback_state = NewCallbackState
+    }.

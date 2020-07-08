@@ -16,16 +16,28 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 18. Jun 2020
+%%% Created : 06. Jul 2020
 %%%-------------------------------------------------------------------
 
+-module(ovsdb_bhvr).
 -author("Vasu Dasari").
 
--type ops_function()    :: ('<' | '<=' | '==' | '!=' | '>=' | '>' | 'includes' | 'excludes').
--type json_value()  :: jsone:json_value().
+%% API
+-export([]).
 
--record(ovsdb_condition, {
-    column      :: json_value(),
-    function    :: ops_function(),
-    value       :: json_value()
-}).
+-callback handle_message(
+        Request :: term(),
+        State :: term()) ->
+    {'ok', State::term()} | {'error', Reason::term()}.
+
+-callback notify(
+        Op :: term(),
+        Message :: term(),
+        State :: term()) ->
+    {'ok', State::term()} | {'error', Reason::term()}.
+
+-callback info(
+        Request :: term(),
+        State :: term()) ->
+    {'ok', State::term()} | {'error', Reason::term()}.
+

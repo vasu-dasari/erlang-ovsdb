@@ -21,7 +21,7 @@
 %%-------------------------------------------------------------------
 -author("Vasu Dasari").
 
--include("ovsdb_api.hrl").
+-include_lib("ovsdb/include/ovsdb_api.hrl").
 -include("logger.hrl").
 
 -define(SERVER, ovsdb_client).
@@ -35,13 +35,14 @@
 ).
 
 -type dst() :: pid() | port() | (RegName :: atom()) | {RegName :: atom(), Node :: node()}.
--type json_value()  :: jsone:json_value().
 -type db_name() :: unicode:chardata().
 -type ip_addr() :: inet:socket_address() | inet:hostname().
 -type proto_type() :: tcp | ssl.
 
 -record(ovsdb_state, {
     proc = ?SERVER          :: dst(),
+    callback_module = ?SERVER :: module(),
+    callback_state          :: term(),
     proto = tcp             :: proto_type(),
     ip_addr = 'any'         :: ip_addr(),
     port = 0                :: inet:port_number(),
