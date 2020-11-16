@@ -96,6 +96,7 @@
 %% Retrieve pid from the options
 %% @private
 get_proc(#{pid := Pid}) -> Pid;
+get_proc(Pid) when is_pid(Pid) -> Pid;
 get_proc(_) -> ?SERVER.
 
 %% @doc Starts TCP connection
@@ -378,8 +379,8 @@ handle_info(Info, State) ->
     end.
 
 %% @hidden
-terminate(_Reason, _State) ->
-    ?INFO("~s going down: ~p", [?MODULE, _Reason]),
+terminate(_Reason, #ovsdb_state{proc = ProcName}) ->
+    ?INFO("~p: ~s going down: ~p", [?MODULE, ProcName, _Reason]),
     ok.
 
 %% @hidden

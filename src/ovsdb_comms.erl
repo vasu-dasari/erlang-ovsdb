@@ -27,6 +27,8 @@
 %% API
 -export([connect/1, close/1, restart/2, recv_data/2, send_data/3]).
 
+-define(ConnectTImeout, 100).
+
 recv_data(<<>>, #ovsdb_state{socket = Socket} = State) ->
     ok = setopts(tcp, Socket, [{active, once}]),
     State;
@@ -62,7 +64,7 @@ connect(#ovsdb_state{
     port = Port,
     timeout = Timeout} = State) ->
     Lib = transport_lib(Protocol),
-    case Lib:connect(Host, Port, opts(Protocol)) of
+    case Lib:connect(Host, Port, opts(Protocol), ?ConnectTImeout) of
         {ok, Socket} ->
             ?INFO("~p: Connected: Socket ~p", [Proc, Socket]),
             ok = setopts(Protocol, Socket, [{active, once}]),
