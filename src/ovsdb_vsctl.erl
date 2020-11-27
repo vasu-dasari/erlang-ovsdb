@@ -28,8 +28,8 @@
 %% API
 -export([
     set_controller/3, del_controller/2
-    , add_br/2, del_br/2
-    , add_port/3, del_port/3
+    , add_br/2, set_br/2, get_br/2, del_br/2
+    , add_port/3, set_port/3, set_iface/3, get_port/3, get_iface/3, del_port/3
     , add_bond/4, del_bond/3
     , add_bond_iface/4, del_bond_iface/4
     , add_tunnel_port/4, del_tunnel_port/3
@@ -74,6 +74,21 @@ del_controller(BrName, Opts) ->
 add_br(BrName, Opts) ->
     vsctl(add_br, Opts#{br_name => BrName}).
 
+%% @doc Set bridge options
+%%
+%% This function will return error if bridge does not exist
+-spec set_br(unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+set_br(BrName, Opts) ->
+    vsctl(set_br, Opts#{br_name => BrName}).
+
+%% @doc Get bridge info from switch
+%%
+%% This is quivalent to
+%%    $ ovs-vsctl del-br br1 ...
+-spec get_br(all | unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+get_br(BrName, Opts) ->
+    vsctl(get_br, Opts#{br_name => BrName}).
+
 %% @doc Deletes a bridge to switch
 %%
 %% This is quivalent to
@@ -91,6 +106,34 @@ del_br(BrName, Opts) ->
 -spec add_port(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
 add_port(BrName, PortName, Opts) ->
     vsctl(add_port, Opts#{br_name => BrName, port_name => PortName, iface_list => [PortName]}).
+
+%% @doc Set other port parameters
+%%
+%% This function will return error if port does not exist
+-spec set_port(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+set_port(BrName, PortName, Opts) ->
+    vsctl(set_port, Opts#{br_name => BrName, port_name => PortName, iface_list => [PortName]}).
+
+%% @doc Set other interface parameters
+%%
+%% This function will return error if interface does not exist
+-spec set_iface(unicode:chardata(), unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+set_iface(BrName, PortName, Opts) ->
+    vsctl(set_port, Opts#{br_name => BrName, port_name => PortName, iface_list => [PortName]}).
+
+%% @doc Get port information
+%%
+%% Gets port information for PortName. To get information of all ports available use `all` option.
+-spec get_port(unicode:chardata(), all | unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+get_port(BrName, PortName, Opts) ->
+    vsctl(get_port, Opts#{br_name => BrName, port_name => PortName}).
+
+%% @doc Get interface information
+%%
+%% Gets interface information for IfName. To get information of all interfaces available use `all` option.
+-spec get_iface(unicode:chardata(), all | unicode:chardata(), ovsdb_client:opts()) -> vsctl_returns().
+get_iface(BrName, IfName, Opts) ->
+    vsctl(get_iface, Opts#{br_name => BrName, port_name => IfName}).
 
 %% @doc Delete port from a bridge
 %%
@@ -198,8 +241,7 @@ do_vsctl(Op, #{br_name := BrName} = Opts) when Op == del_controller ->
         ovsdb_client:transaction(
             ovsdb_ops:select("*", <<"Controller">>, [{<<"_uuid">>, <<"==">>, CtrlrUuId}]), Opts),
     do_vsctl(Op, #{<<"Bridge">> => BrMap, <<"Controller">> => CtrlrMap}, Opts);
-
-do_vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
+do_vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == set_br; Op == del_br ->
     BrInfo = case ovsdb_client:transaction(
         ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]), Opts) of
         {ok,[#{<<"rows">> := [B]}]} when is_map(B) ->
@@ -208,8 +250,53 @@ do_vsctl(Op, #{br_name := BrName} = Opts) when Op == add_br; Op == del_br ->
             #{}
     end,
     do_vsctl(Op, BrInfo, Opts);
+do_vsctl(Op, #{br_name := all} = Opts) when Op == get_br ->
+    case ovsdb_client:transaction(
+        ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"!=">>, <<"">>}]), Opts) of
+        {ok,[#{<<"rows">> := L}]} when is_list(L) ->
+            L;
+        _ ->
+            []
+    end;
+do_vsctl(Op, #{br_name := BrName, port_name := all} = Opts) when Op == get_port ->
+    {ok,[#{<<"rows">> := [BrInfo]}]} = ovsdb_client:transaction([
+        ovsdb_ops:select([<<"ports">>], <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}])
+    ], Opts),
+    case ovsdb_client:transaction([
+        ovsdb_ops:select("*", <<"Port">>, [{<<"_uuid">>, <<"==">>, Uuid}])
+            || Uuid <- get_set(BrInfo, <<"ports">>)
+    ], Opts) of
+        {ok, PortList} ->
+            lists:flatten([maps:get(<<"rows">>, M) || M <- PortList]);
+        PortList ->
+            PortList
+    end;
+do_vsctl(Op, #{br_name := _BrName, port_name := all} = Opts) when Op == get_iface ->
+    IfaceList = [maps:get(<<"interfaces">>, M) || M <- do_vsctl(get_port, Opts)],
+    case ovsdb_client:transaction([
+        ovsdb_ops:select("*", <<"Interface">>, [{<<"_uuid">>, <<"==">>, Uuid}])
+        || Uuid <- IfaceList
+    ], Opts) of
+        {ok, PortList} ->
+            lists:flatten([maps:get(<<"rows">>, M) || M <- PortList]);
+        PortList ->
+            PortList
+    end;
+do_vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts) when Op == get_br;Op == get_port;Op == get_iface ->
+    SelectOp = case Op of
+        get_br -> ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]);
+        get_port -> ovsdb_ops:select("*", <<"Port">>, [{<<"name">>, <<"==">>, PortName}]);
+        get_iface -> ovsdb_ops:select("*", <<"Interface">>, [{<<"name">>, <<"==">>, PortName}])
+    end,
+    case ovsdb_client:transaction([SelectOp], Opts) of
+        {ok,[#{<<"rows">> := [Info]}]} ->
+            Info;
+        R ->
+            R
+    end;
 do_vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
-    when Op == add_port; Op == del_port; Op == del_bond_iface  ->
+    when Op == add_port; Op == set_port; Op == set_iface;
+         Op == del_port; Op == del_bond_iface  ->
 
     Request = [
         ovsdb_ops:select("*", <<"Bridge">>, [{<<"name">>, <<"==">>, BrName}]),
@@ -238,7 +325,9 @@ do_vsctl(Op, #{br_name := BrName, port_name := PortName} = Opts)
         {B, _} when (map_size(B) == 0) and (Op == add_port) ->
             do_vsctl(add_br, Opts),
             do_vsctl(Op, Opts);
-        {B, P} when ((map_size(B) == 0) or (map_size(P) == 0)) and ((Op == del_port) or (Op == del_bond_iface))->
+        {B, P} when ((map_size(B) == 0) or (map_size(P) == 0)) and
+                        ((Op == set_port) or (Op == set_iface) or
+                            (Op == del_port) or (Op == del_bond_iface)) ->
             {error, invalid_configuration};
         _ ->
             do_vsctl(Op, DbInfo, Opts)
@@ -256,8 +345,13 @@ process_vsctl(Cmd, Opts, State) ->
 do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Controller">> := CtrlrInfo},
         Opts) when Op == add_controller; Op == del_controller ->
     controller_cmd(Op, BrInfo, CtrlrInfo, Opts);
-do_vsctl(Op, BrInfo, Opts) when Op == add_br; Op == del_br ->
+do_vsctl(Op, BrInfo, _Opts) when Op == set_br,map_size(BrInfo) == 0 ->
+    {error, does_not_exist};
+do_vsctl(Op, BrInfo, Opts) when Op == add_br; Op == set_br; Op == del_br ->
     bridge_cmd(Op, BrInfo, Opts);
+do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo, <<"Interface">> := IfaceList},
+        Opts) when Op == add_port; Op == del_port ->
+    port_cmd(Op, BrInfo, PortInfo, IfaceList,  Opts);
 do_vsctl(Op, #{<<"Bridge">> := BrInfo, <<"Port">> := PortInfo, <<"Interface">> := IfaceList},
         Opts) when Op == add_port; Op == del_port ->
     port_cmd(Op, BrInfo, PortInfo, IfaceList,  Opts);

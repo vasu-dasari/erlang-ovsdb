@@ -34,6 +34,10 @@ vsctl_test_() ->
             [{N, fun() -> F(S) end} || {N, F} <- [
                 {"add_br",                      fun add_br/1}
                 ,{"add_port",                   fun add_port/1}
+                ,{"get_port",                   fun get_port/1}
+                ,{"get_all_ports",              fun get_all_ports/1}
+                ,{"get_port",                   fun get_iface/1}
+                ,{"get_all_ports",              fun get_all_ifaces/1}
                 ,{"del_port",                   fun del_port/1}
                 ,{"del_br",                     fun del_br/1}
                 ,{"add_bond",                   fun add_bond/1}
@@ -153,6 +157,31 @@ add_port(Opts) ->
         ovsdb_vsctl:add_port(<<"br1">>, <<"br1-eth1">>, Opts)
     ),
     ovsdb_client_tests:verify_ovs({list_ports, "br1"}, "br1-eth1").
+
+get_port(Opts) ->
+    ?assertMatch(
+        #{<<"name">> := <<"br1-eth1">>},
+        ovsdb_vsctl:get_port(<<"br1">>, <<"br1-eth1">>, Opts)
+    ).
+
+get_all_ports(Opts) ->
+    ?assertMatch(
+        [#{<<"name">> := _},#{<<"name">> := _}],
+        ovsdb_vsctl:get_port(<<"br1">>, all, Opts)
+    ).
+
+
+get_iface(Opts) ->
+    ?assertMatch(
+        #{<<"name">> := <<"br1-eth1">>},
+        ovsdb_vsctl:get_iface(<<"br1">>, <<"br1-eth1">>, Opts)
+    ).
+
+get_all_ifaces(Opts) ->
+    ?assertMatch(
+        [#{<<"name">> := _},#{<<"name">> := _}],
+        ovsdb_vsctl:get_iface(<<"br1">>, all, Opts)
+    ).
 
 del_port(Opts) ->
     ?assertEqual(

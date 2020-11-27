@@ -84,8 +84,8 @@
 -type opts()        :: #{
             pid => dst(),
             database => db_name(),
-            br_name => unicode:chardata(),
-            port_name => unicode:chardata(),
+            br_name => all | unicode:chardata(),
+            port_name => all | unicode:chardata(),
             _ => term()
         }.
 
