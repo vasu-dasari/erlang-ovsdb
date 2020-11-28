@@ -1,4 +1,4 @@
-FROM vdasari/erlango:latest
+FROM erlang:23
 MAINTAINER vdasari@gmail.com
 
 RUN set -xe \

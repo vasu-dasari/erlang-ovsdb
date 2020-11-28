@@ -1,4 +1,4 @@
--sname ovsdb
+-name ovsdb
 
 -setcookie ovsdb_cookie
 

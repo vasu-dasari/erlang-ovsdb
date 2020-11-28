@@ -7,10 +7,11 @@ services:
       dockerfile: Dockerfile.ovsdb
     image: vdasari/ovsdb:latest
     container_name: ovsdb
-    hostname: ovsdb
+    hostname: ovsdb.lan
     volumes:
         - ${HOME}:${HOME}
     privileged: true
+    tty: true
     networks:
       default_ovsdb_net:
         ipv4_address: 10.1.123.10
