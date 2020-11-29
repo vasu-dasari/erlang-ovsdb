@@ -27,7 +27,8 @@
 -export([
     pretty_print/1, backtrace/0, whocalledme/0,
     to_binstring/1, uuid/2,
-    parse_server_str/1
+    parse_server_str/1,
+    zipWithPadding/2
 ]).
 -export([
     ovs_connect/0
@@ -83,3 +84,8 @@ ovs_connect() ->
 
 get_server() ->
     os:getenv("OVSDB_SERVER", "tcp:10.1.123.20:6640").
+
+zipWithPadding([X | Xs], [Y | Ys]) -> [{X, Y} | zipWithPadding(Xs, Ys)];
+zipWithPadding([X | Xs], []) -> [{X, padding} | zipWithPadding(Xs, [])];
+zipWithPadding([], [Y | Ys]) -> [{padding, Y} | zipWithPadding([], Ys)];
+zipWithPadding([], []) -> [].

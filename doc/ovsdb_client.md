@@ -78,7 +78,7 @@ json_value() = <a href="jsone.md#type-json_value">jsone:json_value()</a>
 
 
 <pre><code>
-opts() = #{pid =&gt; <a href="#type-dst">dst()</a>, database =&gt; <a href="#type-db_name">db_name()</a>, br_name =&gt; <a href="unicode.md#type-chardata">unicode:chardata()</a>, port_name =&gt; <a href="unicode.md#type-chardata">unicode:chardata()</a>, term() =&gt; term()}
+opts() = #{pid =&gt; <a href="#type-dst">dst()</a>, database =&gt; <a href="#type-db_name">db_name()</a>, br_name =&gt; all | <a href="unicode.md#type-chardata">unicode:chardata()</a>, port_name =&gt; all | <a href="unicode.md#type-chardata">unicode:chardata()</a>, term() =&gt; term()}
 </code></pre>
 
 
